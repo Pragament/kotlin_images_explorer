@@ -10,6 +10,6 @@ interface ImageRepository {
     suspend fun getAllTags(): Flow<List<Tag>>
     suspend fun updateImageText(imageId: Long, extractedText: String)
     suspend fun scanDeviceImages()
-    suspend fun processImage(imageId: Long, uri: String): String
+    suspend fun processImage(imageId: Long, uri: String,modelName: String): String
     suspend fun insertImage(image: ImageInfo)
 } 
