@@ -24,8 +24,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
-import com.bumptech.glide.integration.compose.GlideImage
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.TaggedImagesListViewModel
 import com.pragament.kotlin_images_explorer.ui.KotlinImagesExplorerIcons
@@ -259,7 +257,7 @@ fun TaggedImagesListScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalGlideComposeApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ScannedImageCard(
     image: ImageInfo,
