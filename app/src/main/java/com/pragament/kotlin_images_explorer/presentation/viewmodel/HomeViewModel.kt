@@ -90,86 +90,65 @@ class HomeViewModel(
         }
     }
 
-    private fun processSelectedImages(uris: List<String>) {
-        viewModelScope.launch {
-            _state.update { it.copy(isScanning = true) }
-
-            // Create image info entities and insert them into database
-            processedImages = uris.mapIndexed { index, uri ->
-                ImageInfo(
-                    id = System.currentTimeMillis() + index, // unique IDs
-                    uri = uri,
-                    displayName = uri.substringAfterLast("/"),
-                    dateAdded = System.currentTimeMillis(),
-                    extractedText = null
-                )
-            }.toMutableList()
-
-            // Insert images into database
-            processedImages.forEach { image ->
-                repository.insertImage(image)
-            }
-
-            totalImages = processedImages.size
-            currentImageIndex = 0
-
-            _state.update {
-                it.copy(
-                    isScanning = false,
-                    isProcessing = true
-                )
-            }
-
-            startProcessing()
-        }
-    }
-
     private fun startProcessing() {
         if (processingJob?.isActive == true) return
 
         processingJob = viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    isProcessing = true,
-                    isPaused = false
-                )
+            _state.update { it.copy(isProcessing = true, isPaused = false) }
+
+            val selectedModel = settingsDataStore.selectedModel.first() // Get model name
+
+            if (processedImages.isEmpty()) {
+                val images = repository.getAllImages().first()
+                processedImages = images.filter { it.extractedText == null }.toMutableList()
+                totalImages = processedImages.size
+                currentImageIndex = 0
             }
 
-            try {
-                // If we don't have any images to process yet, get unprocessed images
-                if (processedImages.isEmpty()) {
-                    val images = repository.getAllImages().first()
-                    processedImages = images.filter { it.extractedText == null }.toMutableList()
-                    totalImages = processedImages.size
-                    currentImageIndex = 0
-                }
-
-                if (processedImages.isNotEmpty()) {
-                    processedImages.drop(currentImageIndex).forEach { image ->
-                        try {
-                            val extractedText = repository.processImage(image.id, image.uri)
-                            repository.updateImageText(image.id, extractedText)
-                            currentImageIndex++
-                            updateProgress()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
+            if (processedImages.isNotEmpty()) {
+                processedImages.drop(currentImageIndex).forEach { image ->
+                    try {
+                        val extractedText = repository.processImage(image.id, image.uri, selectedModel)
+                        repository.updateImageText(image.id, extractedText)
+                        currentImageIndex++
+                        updateProgress()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
-
-                    // Check if processing is complete
-                    if (currentImageIndex >= totalImages) {
-                        resetProcessingState()
-                    }
-                } else {
-                    // No images to process, reset state
-                    resetProcessingState()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                resetProcessingState()
-            }
+                if (currentImageIndex >= totalImages) resetProcessingState()
+            } else resetProcessingState()
         }
     }
+
+    private fun processSelectedImages(uris: List<String>) {
+        viewModelScope.launch {
+            _state.update { it.copy(isScanning = true) }
+
+            val selectedModel = settingsDataStore.selectedModel.first() // Get model name
+
+            processedImages = uris.mapIndexed { index, uri ->
+                ImageInfo(
+                    id = System.currentTimeMillis() + index,
+                    uri = uri,
+                    displayName = uri.substringAfterLast("/"),
+                    dateAdded = System.currentTimeMillis(),
+                    extractedText = null,
+                    label = "Unknown",
+                    confidence = 0.0f,
+                    modelName = selectedModel
+                )
+            }.toMutableList()
+
+            processedImages.forEach { image -> repository.insertImage(image) }
+            totalImages = processedImages.size
+            currentImageIndex = 0
+
+            _state.update { it.copy(isScanning = false, isProcessing = true) }
+            startProcessing()
+        }
+    }
+
 
     private fun pauseProcessing() {
         processingJob?.cancel()

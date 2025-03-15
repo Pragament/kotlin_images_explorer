@@ -3,11 +3,13 @@ package com.pragament.kotlin_images_explorer.data.repository
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.MediaStore
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.pragament.kotlin_images_explorer.ImageClassifier
 import com.pragament.kotlin_images_explorer.data.local.dao.ImageInfoDao
 import com.pragament.kotlin_images_explorer.data.local.entity.ImageInfoEntity
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
@@ -87,7 +89,10 @@ class ImageRepositoryImpl(
                         uri = contentUri.toString(),
                         displayName = name,
                         dateAdded = dateAdded,
-                        extractedText = null
+                        extractedText = null,
+                        label = null,
+                        confidence = null,
+                        modelName = null
                     )
                     imageDao.insertImage(image)
                 }
@@ -95,19 +100,51 @@ class ImageRepositoryImpl(
         }
     }
 
-    override suspend fun processImage(imageId: Long, uri: String): String {
+    override suspend fun processImage(imageId: Long, uri: String, modelName: String): String {
         return withContext(Dispatchers.IO) {
             try {
                 val parsedUri = Uri.parse(uri)
+                val bitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(parsedUri))
+                    ?: return@withContext "Error: Could not decode image."
+
                 val inputImage = InputImage.fromFilePath(context, parsedUri)
-                val result = textRecognizer.process(inputImage).await()
-                result.text
+                val textResult = textRecognizer.process(inputImage).await().text
+
+                val modelPath = getModelPath(modelName)
+                val classifier = ImageClassifier(context, modelPath)
+
+                val classificationResult = if (modelName == "mobilenet_v1") {
+                    classifier.classify(bitmap) ?: classifier.classifyModel2(bitmap)
+                } else {
+                    classifier.classifyModel2(bitmap)
+                }
+
+                val classificationText = classificationResult?.let { (label, confidence) ->
+                    "$label $confidence"
+                } ?: "No classification result"
+
+                // Update the image entity with the new details
+                val image = imageDao.getImageById(imageId) // Assuming you have a function to fetch the image by id
+                image?.let {
+                    val updatedImage = it.copy(
+                        extractedText = textResult,
+                        label = classificationResult?.first,
+                        confidence = classificationResult?.second,
+                        modelName = modelName
+                    )
+                    imageDao.updateImage(updatedImage) // Assuming you have an update function
+                }
+
+                "Classification: $classificationText\nModelName: $modelName\nText: $textResult\n"
             } catch (e: Exception) {
                 e.printStackTrace()
-                ""
+                "Error: ${e.message}"
             }
         }
     }
+
+
+
 
     override suspend fun insertImage(image: ImageInfo) {
         imageDao.insertImage(
@@ -116,16 +153,31 @@ class ImageRepositoryImpl(
                 uri = image.uri,
                 displayName = image.displayName,
                 dateAdded = image.dateAdded,
-                extractedText = image.extractedText
+                extractedText = image.extractedText,
+                label = image.label ,
+                confidence = image.confidence ,
+                modelName = image.modelName
             )
         )
     }
+
 
     private fun ImageInfoEntity.toDomainModel() = ImageInfo(
         id = id,
         uri = uri,
         displayName = displayName,
         dateAdded = dateAdded,
-        extractedText = extractedText
+        extractedText = extractedText,
+        label = label,
+        confidence = confidence,
+        modelName = modelName
     )
-} 
+}
+
+private fun getModelPath(modelName: String): String {
+    return when (modelName) {
+        "mobilenet_v1" -> "model1.tflite"
+        "mobilenet_v2" -> "model2.tflite"
+        else -> throw IllegalArgumentException("Unsupported model: $modelName")
+    }
+}

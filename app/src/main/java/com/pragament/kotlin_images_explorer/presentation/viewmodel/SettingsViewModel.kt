@@ -32,6 +32,11 @@ class SettingsViewModel(
                 _state.update { it.copy(scanMode = mode) }
             }
         }
+        viewModelScope.launch {
+            settingsDataStore.selectedModel.collect { model ->
+                _state.update { it.copy(selectedModel = model) }
+            }
+        }
     }
 
     fun onEvent(event: SettingsEvent) {
@@ -61,7 +66,10 @@ class SettingsViewModel(
                 uri = uri,
                 displayName = uri.substringAfterLast("/"),
                 dateAdded = System.currentTimeMillis(),
-                extractedText = null
+                extractedText = null,
+                label = "Unknown",
+                confidence = 0.0f,
+                modelName = "N/A"
             )
         }.toMutableList()
         totalImages = processedImages.size
@@ -81,7 +89,7 @@ class SettingsViewModel(
 
             processedImages.drop(currentImageIndex).forEach { image ->
                 try {
-                    val extractedText = repository.processImage(image.id, image.uri)
+                    val extractedText = repository.processImage(image.id, image.uri, _state.value.selectedModel)
                     repository.updateImageText(image.id, extractedText)
                     currentImageIndex++
                     updateProgress()
@@ -120,6 +128,12 @@ class SettingsViewModel(
             settingsDataStore.setScanMode(mode)
         }
     }
+
+    fun setModel(model: String) {
+        viewModelScope.launch {
+            settingsDataStore.setSelectedModel(model)
+        }
+    }
 }
 
 data class SettingsState(
@@ -127,11 +141,12 @@ data class SettingsState(
     val isProcessing: Boolean = false,
     val isPaused: Boolean = false,
     val progress: Float = 0f,
-    val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES
+    val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES,
+    val selectedModel: String = "mobilenet_v1" // Default model
 )
 
 sealed interface SettingsEvent {
     object ScanAllDeviceImages : SettingsEvent
     data class ProcessSelectedImages(val uris: List<String>) : SettingsEvent
     object ToggleProcessing : SettingsEvent
-} 
+}

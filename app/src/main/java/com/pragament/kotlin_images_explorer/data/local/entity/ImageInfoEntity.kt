@@ -9,5 +9,8 @@ data class ImageInfoEntity(
     val uri: String,
     val displayName: String,
     val dateAdded: Long,
-    val extractedText: String?
-) 
+    val extractedText: String?,
+    val label: String?,
+    val confidence: Float?,
+    val modelName: String?
+)

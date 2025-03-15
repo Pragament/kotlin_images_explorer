@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.pragament.kotlin_images_explorer.data.local.entity.ImageInfoEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -17,6 +18,12 @@ interface ImageInfoDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertImage(image: ImageInfoEntity)
+
+    @Update
+    suspend fun updateImage(image: ImageInfoEntity)
+
+    @Query("SELECT * FROM images WHERE id = :id")
+    suspend fun getImageById(id: Long): ImageInfoEntity?
 
     @Query("UPDATE images SET extractedText = :text WHERE id = :imageId")
     suspend fun updateImageText(imageId: Long, text: String)
