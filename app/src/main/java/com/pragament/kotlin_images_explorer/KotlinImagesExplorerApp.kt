@@ -13,6 +13,7 @@ class KotlinImagesExplorerApp: Application() {
         startKoin {
             androidContext(this@KotlinImagesExplorerApp)
             androidLogger(Level.ERROR)
+
             modules(appModule)
         }
     }

@@ -25,7 +25,6 @@ val appModule = module {
     }
 
     single { get<ImageDatabase>().imageDao }
-    single { get<ImageDatabase>().videoFrameDao } // Add this line
 
     single<ContentResolver> {
         androidContext().contentResolver
@@ -35,8 +34,7 @@ val appModule = module {
         ImageRepositoryImpl(
             context = androidContext(),
             contentResolver = get(),
-            imageDao = get(),
-            videoFrameDao = get() // Add this line
+            imageDao = get()
         )
     }
 
@@ -51,6 +49,4 @@ val appModule = module {
         )
     }
     viewModelOf(::SettingsViewModel)
-
-//    viewModel { VideoViewModel(get()) }
 }
