@@ -53,6 +53,12 @@ android {
 
 dependencies {
 
+    implementation(libs.glide) // Latest version
+//    kapt(libs.compiler)
+    implementation(libs.compose)
+
+
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 

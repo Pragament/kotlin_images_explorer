@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
+import com.pragament.kotlin_images_explorer.domain.model.VideoFrame
 import com.pragament.kotlin_images_explorer.domain.repository.ImageRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,20 +17,27 @@ class TaggedImagesListViewModel(
     val state: StateFlow<TaggedImagesListState> = _state.asStateFlow()
 
     init {
-        loadProcessedImages()
+        loadProcessedData()
     }
 
-    private fun loadProcessedImages() {
+    private fun loadProcessedData() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            repository.getAllImages().collect { images ->
-                val processedImages = images.filter { !it.extractedText.isNullOrEmpty() }
-                _state.update {
-                    it.copy(
-                        images = processedImages,
-                        isLoading = false
-                    )
-                }
+
+            // Fetch images
+            val images = repository.getAllImages().first()
+            val processedImages = images.filter { !it.extractedText.isNullOrEmpty() }
+
+            // Fetch video frames
+            val videoFrames = repository.getAllVideoFrames().first()
+            val processedVideoFrames = videoFrames.filter { !it.extractedText.isNullOrEmpty() }
+
+            _state.update {
+                it.copy(
+                    images = processedImages,
+                    videoFrames = processedVideoFrames, // Update this line
+                    isLoading = false
+                )
             }
         }
     }
@@ -66,12 +74,13 @@ class TaggedImagesListViewModel(
 
     fun clearFilters() {
         viewModelScope.launch {
-            loadProcessedImages()
+            loadProcessedData() //changed the whole loadProcessedImages() function to loadProcessedData() with addition for videos
         }
     }
 }
 
 data class TaggedImagesListState(
     val images: List<ImageInfo> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val videoFrames: List<VideoFrame> = emptyList()
 )
