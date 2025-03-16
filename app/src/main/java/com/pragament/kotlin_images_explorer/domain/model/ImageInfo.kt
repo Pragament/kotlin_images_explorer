@@ -5,5 +5,8 @@ data class ImageInfo(
     val uri: String,
     val displayName: String,
     val dateAdded: Long,
-    val extractedText: String? = null
+    val extractedText: String? = null,
+    val label: String?,
+    val confidence: Float?,
+    val modelName: String?
 ) 

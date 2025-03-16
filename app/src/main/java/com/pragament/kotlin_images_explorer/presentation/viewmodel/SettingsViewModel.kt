@@ -33,8 +33,8 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
-            settingsDataStore.frameInterval.collect { interval ->
-                _state.update { it.copy(frameInterval = interval) }
+            settingsDataStore.selectedModel.collect { model ->
+                _state.update { it.copy(selectedModel = model) }
             }
         }
     }
@@ -66,7 +66,10 @@ class SettingsViewModel(
                 uri = uri,
                 displayName = uri.substringAfterLast("/"),
                 dateAdded = System.currentTimeMillis(),
-                extractedText = null
+                extractedText = null,
+                label = "Unknown",
+                confidence = 0.0f,
+                modelName = "N/A"
             )
         }.toMutableList()
         totalImages = processedImages.size
@@ -86,7 +89,7 @@ class SettingsViewModel(
 
             processedImages.drop(currentImageIndex).forEach { image ->
                 try {
-                    val extractedText = repository.processImage(image.id, image.uri)
+                    val extractedText = repository.processImage(image.id, image.uri, _state.value.selectedModel)
                     repository.updateImageText(image.id, extractedText)
                     currentImageIndex++
                     updateProgress()
@@ -126,9 +129,9 @@ class SettingsViewModel(
         }
     }
 
-    fun setFrameInterval(interval: Float) {
+    fun setModel(model: String) {
         viewModelScope.launch {
-            settingsDataStore.setFrameInterval(interval)
+            settingsDataStore.setSelectedModel(model)
         }
     }
 }
@@ -139,11 +142,11 @@ data class SettingsState(
     val isPaused: Boolean = false,
     val progress: Float = 0f,
     val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES,
-    val frameInterval: Float = 1.0f // Default interval is 1 second
+    val selectedModel: String = "mobilenet_v1" // Default model
 )
 
 sealed interface SettingsEvent {
     object ScanAllDeviceImages : SettingsEvent
     data class ProcessSelectedImages(val uris: List<String>) : SettingsEvent
     object ToggleProcessing : SettingsEvent
-} 
+}
