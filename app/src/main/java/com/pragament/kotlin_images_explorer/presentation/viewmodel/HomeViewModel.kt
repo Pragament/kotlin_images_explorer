@@ -62,6 +62,39 @@ class HomeViewModel(
             HomeEvent.StopProcessing -> stopProcessing()
             HomeEvent.ScanImages -> scanImages()
             is HomeEvent.ProcessSelectedImages -> processSelectedImages(event.uris)
+            is HomeEvent.ProcessSelectedVideos -> processSelectedVideos(event.uris) // New event handler
+        }
+    }
+
+    private fun processSelectedVideos(uris: List<String>) {
+        viewModelScope.launch {
+            try {
+                _state.update { it.copy(isScanning = true) }
+                println("Selected videos: $uris") // Log the selected video URIs
+
+                val frameInterval = settingsDataStore.frameInterval.first() // Get the selected interval
+
+                uris.forEach { videoUri ->
+                    val frames = repository.extractFrames(videoUri, (frameInterval * 1000).toLong()) // Convert to milliseconds
+                    println("Extracted ${frames.size} frames from video: $videoUri") // Log the number of frames extracted
+
+                    frames.forEach { frame ->
+                        try {
+                            val extractedText = repository.processFrame(frame)
+                            println("Extracted text from frame: $extractedText") // Log the extracted text
+                            repository.insertFrame(frame.copy(extractedText = extractedText))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            println("Error processing frame: ${e.message}")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                println("Error processing video: ${e.message}")
+            } finally {
+                _state.update { it.copy(isScanning = false) }
+            }
         }
     }
 
@@ -219,4 +252,5 @@ sealed interface HomeEvent {
     data object StopProcessing : HomeEvent
     data object ScanImages : HomeEvent
     data class ProcessSelectedImages(val uris: List<String>) : HomeEvent
+    data class ProcessSelectedVideos(val uris: List<String>) : HomeEvent // New event
 } 

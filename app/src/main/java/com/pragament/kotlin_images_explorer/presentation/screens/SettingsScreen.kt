@@ -1,11 +1,20 @@
 package com.pragament.kotlin_images_explorer.presentation.screens
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,13 +32,12 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()) // Enables scrolling
     ) {
         Text(
             text = "Scan Mode Settings",
             style = MaterialTheme.typography.titleLarge
         )
-
+        
         Spacer(modifier = Modifier.height(24.dp))
 
         Card(
@@ -44,27 +52,27 @@ fun SettingsScreen(
                     text = "Choose how to scan images",
                     style = MaterialTheme.typography.titleMedium
                 )
-
+                
                 Spacer(modifier = Modifier.height(16.dp))
-
+                
                 ScanModeOption(
                     title = "All Device Images",
                     description = "Scan and process all images on your device",
                     selected = state.scanMode == ScanMode.ALL_DEVICE_IMAGES,
                     onClick = { viewModel.setScanMode(ScanMode.ALL_DEVICE_IMAGES) }
                 )
-
+                
                 Spacer(modifier = Modifier.height(8.dp))
-
+                
                 ScanModeOption(
                     title = "Multiple Images",
                     description = "Select multiple images to scan and process",
                     selected = state.scanMode == ScanMode.MULTIPLE_IMAGES,
                     onClick = { viewModel.setScanMode(ScanMode.MULTIPLE_IMAGES) }
                 )
-
+                
                 Spacer(modifier = Modifier.height(8.dp))
-
+                
                 ScanModeOption(
                     title = "Single Image",
                     description = "Select one image at a time to scan and process",
@@ -76,14 +84,6 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Model Selection Section
-        Text(
-            text = "Model Selection",
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         Card(
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -93,24 +93,32 @@ fun SettingsScreen(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Choose a model for processing images",
+                    text = "Frame Extraction Interval",
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                ModelSelectionOption(
-                    title = "MobileNet V1",
-                    selected = state.selectedModel == "mobilenet_v1",
-                    onClick = { viewModel.setModel("mobilenet_v1") }
+                FrameIntervalOption(
+                    title = "0.5 seconds",
+                    selected = state.frameInterval == 0.5f,
+                    onClick = { viewModel.setFrameInterval(0.5f) }
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                ModelSelectionOption(
-                    title = "MobileNet V2",
-                    selected = state.selectedModel == "mobilenet_v2",
-                    onClick = { viewModel.setModel("mobilenet_v2") }
+                FrameIntervalOption(
+                    title = "1 second",
+                    selected = state.frameInterval == 1.0f,
+                    onClick = { viewModel.setFrameInterval(1.0f) }
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                FrameIntervalOption(
+                    title = "2 seconds",
+                    selected = state.frameInterval == 2.0f,
+                    onClick = { viewModel.setFrameInterval(2.0f) }
                 )
             }
         }
@@ -127,8 +135,8 @@ private fun ScanModeOption(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable { onClick() }
+            .padding(vertical = 4.dp),
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
@@ -156,7 +164,7 @@ private fun ScanModeOption(
 }
 
 @Composable
-private fun ModelSelectionOption(
+private fun FrameIntervalOption(
     title: String,
     selected: Boolean,
     onClick: () -> Unit
@@ -164,8 +172,8 @@ private fun ModelSelectionOption(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable { onClick() }
+            .padding(vertical = 4.dp),
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier

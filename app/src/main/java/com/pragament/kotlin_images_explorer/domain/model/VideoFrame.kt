@@ -1,9 +1,9 @@
 package com.pragament.kotlin_images_explorer.domain.model
 
-data class ImageInfo(
+data class VideoFrame(
     val id: Long,
-    val uri: String,
-    val displayName: String,
-    val dateAdded: Long,
+    val videoUri: String,
+    val frameUri: String,
+    val timestamp: Long,
     val extractedText: String? = null
-) 
+)
