@@ -32,6 +32,11 @@ class SettingsViewModel(
                 _state.update { it.copy(scanMode = mode) }
             }
         }
+        viewModelScope.launch {
+            settingsDataStore.frameInterval.collect { interval ->
+                _state.update { it.copy(frameInterval = interval) }
+            }
+        }
     }
 
     fun onEvent(event: SettingsEvent) {
@@ -120,6 +125,12 @@ class SettingsViewModel(
             settingsDataStore.setScanMode(mode)
         }
     }
+
+    fun setFrameInterval(interval: Float) {
+        viewModelScope.launch {
+            settingsDataStore.setFrameInterval(interval)
+        }
+    }
 }
 
 data class SettingsState(
@@ -127,7 +138,8 @@ data class SettingsState(
     val isProcessing: Boolean = false,
     val isPaused: Boolean = false,
     val progress: Float = 0f,
-    val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES
+    val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES,
+    val frameInterval: Float = 1.0f // Default interval is 1 second
 )
 
 sealed interface SettingsEvent {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
+import com.pragament.kotlin_images_explorer.domain.model.VideoFrame
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.TaggedImagesListViewModel
 import com.pragament.kotlin_images_explorer.ui.KotlinImagesExplorerIcons
 import org.koin.androidx.compose.koinViewModel
@@ -104,6 +106,14 @@ fun TaggedImagesListScreen(
                                 onTagClick = onTagSelected
                             )
                         }
+
+                        // Display video frames
+                        items(state.videoFrames) { frame ->
+                            ScannedVideoFrameCard(
+                                frame = frame,
+                                onTagClick = onTagSelected
+                            )
+                        }
                     }
                 }
             }
@@ -167,6 +177,43 @@ private fun ScannedImageCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ScannedVideoFrameCard(
+    frame: VideoFrame,
+    onTagClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            AsyncImage(
+                model = frame.frameUri,
+                contentDescription = "Video Frame",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f) // Adjust aspect ratio for video frames
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!frame.extractedText.isNullOrEmpty()) {
+                Text(
+                    text = frame.extractedText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(8.dp)
+                )
             }
         }
     }

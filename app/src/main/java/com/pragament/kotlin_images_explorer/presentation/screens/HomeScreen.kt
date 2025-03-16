@@ -46,6 +46,14 @@ fun HomeScreen(
         }
     }
 
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.onEvent(HomeEvent.ProcessSelectedVideos(listOf(uri.toString())))
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -72,7 +80,19 @@ fun HomeScreen(
                     }
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = { videoPickerLauncher.launch("video/*") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Scan Video")
+            }
+        }
+
+        // Show a loading message when scanning is in progress
+        if (state.isScanning) {
+            Text("Scanning and processing video...")
         }
 
         if (state.scanMode == ScanMode.ALL_DEVICE_IMAGES) {

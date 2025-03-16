@@ -81,6 +81,47 @@ fun SettingsScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Frame Extraction Interval",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                FrameIntervalOption(
+                    title = "0.5 seconds",
+                    selected = state.frameInterval == 0.5f,
+                    onClick = { viewModel.setFrameInterval(0.5f) }
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                FrameIntervalOption(
+                    title = "1 second",
+                    selected = state.frameInterval == 1.0f,
+                    onClick = { viewModel.setFrameInterval(1.0f) }
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                FrameIntervalOption(
+                    title = "2 seconds",
+                    selected = state.frameInterval == 2.0f,
+                    onClick = { viewModel.setFrameInterval(2.0f) }
+                )
+            }
+        }
     }
 }
 
@@ -114,6 +155,37 @@ private fun ScanModeOption(
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+            RadioButton(
+                selected = selected,
+                onClick = onClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun FrameIntervalOption(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall
+            )
             RadioButton(
                 selected = selected,
                 onClick = onClick
