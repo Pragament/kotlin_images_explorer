@@ -91,4 +91,10 @@ dependencies {
     // ML Kit
     implementation(libs.text.recognition)
     implementation(libs.play.services.mlkit.text.recognition)
+
+    // tensorflow
+    implementation ("org.tensorflow:tensorflow-lite:2.12.0")
+    implementation ("org.tensorflow:tensorflow-lite-support:0.4.3")
+
+
 }
