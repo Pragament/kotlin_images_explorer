@@ -32,6 +32,13 @@ class SettingsViewModel(
                 _state.update { it.copy(scanMode = mode) }
             }
         }
+
+        viewModelScope.launch {
+            settingsDataStore.frameInterval.collect { interval ->
+                _state.update { it.copy(frameInterval = interval) }
+            }
+        }
+
         viewModelScope.launch {
             settingsDataStore.selectedModel.collect { model ->
                 _state.update { it.copy(selectedModel = model) }
@@ -129,6 +136,12 @@ class SettingsViewModel(
         }
     }
 
+    fun setFrameInterval(interval: Float) {
+        viewModelScope.launch {
+            settingsDataStore.setFrameInterval(interval)
+        }
+    }
+
     fun setModel(model: String) {
         viewModelScope.launch {
             settingsDataStore.setSelectedModel(model)
@@ -142,6 +155,7 @@ data class SettingsState(
     val isPaused: Boolean = false,
     val progress: Float = 0f,
     val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES,
+    val frameInterval: Float = 1.0f,
     val selectedModel: String = "mobilenet_v1" // Default model
 )
 
