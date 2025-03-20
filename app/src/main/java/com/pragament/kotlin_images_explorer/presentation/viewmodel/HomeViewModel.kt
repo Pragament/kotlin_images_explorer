@@ -6,6 +6,7 @@ import com.pragament.kotlin_images_explorer.data.local.ScanMode
 import com.pragament.kotlin_images_explorer.data.local.SettingsDataStore
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
 import com.pragament.kotlin_images_explorer.domain.model.Tag
+import com.pragament.kotlin_images_explorer.domain.model.VideoFrame
 import com.pragament.kotlin_images_explorer.domain.repository.ImageRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,43 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class ProcessingProgress(
+    val current: Int = 0,
+    val total: Int = 0,
+    val currentItem: String = "",
+    val type: ProcessingType = ProcessingType.NONE
+)
+
+enum class ProcessingType {
+    NONE,
+    IMAGES,
+    VIDEOS
+}
+
+data class HomeViewState(
+    val isScanning: Boolean = false,
+    val isProcessing: Boolean = false,
+    val isPaused: Boolean = false,
+    val progress: ProcessingProgress = ProcessingProgress(),
+    val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES,
+    val recentScans: List<ImageInfo> = emptyList(),
+    val videoFrames: List<VideoFrame> = emptyList(),
+    val tags: List<Tag> = emptyList(),
+    val error: String? = null
+)
+
+sealed class HomeEvent {
+    data object StartProcessing : HomeEvent()
+    data object PauseProcessing : HomeEvent()
+    data object ResumeProcessing : HomeEvent()
+    data object StopProcessing : HomeEvent()
+    data object ScanImages : HomeEvent()
+    data object ScanVideos : HomeEvent()
+    data class ProcessSelectedImages(val uris: List<String>) : HomeEvent()
+    data class ProcessSelectedVideos(val uris: List<String>) : HomeEvent()
+    data class SelectTag(val tag: Tag) : HomeEvent()
+}
 
 class HomeViewModel(
     private val repository: ImageRepository,
@@ -31,6 +69,7 @@ class HomeViewModel(
     init {
         observeTags()
         observeRecentScans()
+        observeVideoFrames()
         viewModelScope.launch {
             settingsDataStore.scanMode.collect { mode ->
                 _state.update { it.copy(scanMode = mode) }
@@ -40,9 +79,15 @@ class HomeViewModel(
 
     private fun observeTags() {
         viewModelScope.launch {
-            repository.getAllTags().collect { tags ->
-                _state.update { it.copy(tags = tags) }
-            }
+            repository.getAllTags()
+                .collect { tags ->
+                    // Filter out empty tags and sort by frequency
+                    val validTags = tags
+                        .filter { it.word.isNotBlank() }
+                        .sortedByDescending { it.frequency }
+                    println("DEBUG: Observing ${validTags.size} valid tags")
+                    _state.update { it.copy(tags = validTags) }
+                }
         }
     }
 
@@ -54,6 +99,14 @@ class HomeViewModel(
         }
     }
 
+    private fun observeVideoFrames() {
+        viewModelScope.launch {
+            repository.getAllVideoFrames().collect { frames ->
+                _state.update { it.copy(videoFrames = frames) }
+            }
+        }
+    }
+
     fun onEvent(event: HomeEvent) {
         when (event) {
             HomeEvent.StartProcessing -> startProcessing()
@@ -61,64 +114,175 @@ class HomeViewModel(
             HomeEvent.ResumeProcessing -> resumeProcessing()
             HomeEvent.StopProcessing -> stopProcessing()
             HomeEvent.ScanImages -> scanImages()
+            HomeEvent.ScanVideos -> scanVideos()
             is HomeEvent.ProcessSelectedImages -> processSelectedImages(event.uris)
             is HomeEvent.ProcessSelectedVideos -> processSelectedVideos(event.uris)
+            is HomeEvent.SelectTag -> navigateToFilteredImages(event.tag)
         }
     }
 
-    private fun processSelectedVideos(uris: List<String>) {
+    private fun scanVideos() {
         viewModelScope.launch {
             try {
-                _state.update { it.copy(isScanning = true) }
-                println("Selected videos: $uris") // Log the selected video URIs
-
-                val frameInterval = settingsDataStore.frameInterval.first() // Get the selected interval
-
-                uris.forEach { videoUri ->
-                    val frames = repository.extractFrames(videoUri, (frameInterval * 1000).toLong()) // Convert to milliseconds
-                    println("Extracted ${frames.size} frames from video: $videoUri") // Log the number of frames extracted
-
-                    frames.forEach { frame ->
-                        try {
-                            val extractedText = repository.processFrame(frame)
-                            println("Extracted text from frame: $extractedText") // Log the extracted text
-                            repository.insertFrame(frame.copy(extractedText = extractedText))
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            println("Error processing frame: ${e.message}")
-                        }
-                    }
+                _state.update { 
+                    it.copy(
+                        isScanning = true,
+                        progress = ProcessingProgress(type = ProcessingType.VIDEOS)
+                    )
                 }
+                repository.scanDeviceVideos()
             } catch (e: Exception) {
-                e.printStackTrace()
-                println("Error processing video: ${e.message}")
+                _state.update { it.copy(error = e.message) }
             } finally {
                 _state.update { it.copy(isScanning = false) }
             }
         }
     }
 
+    private fun processSelectedVideos(uris: List<String>) {
+        viewModelScope.launch {
+            try {
+                _state.update { 
+                    it.copy(
+                        isProcessing = true,
+                        progress = ProcessingProgress(
+                            total = uris.size,
+                            type = ProcessingType.VIDEOS
+                        )
+                    )
+                }
+
+                val frameInterval = settingsDataStore.frameInterval.first()
+
+                uris.forEachIndexed { index, videoUri ->
+                    if (_state.value.isPaused) {
+                        return@forEachIndexed
+                    }
+
+                    _state.update {
+                        it.copy(progress = it.progress.copy(
+                            current = index + 1,
+                            currentItem = videoUri.substringAfterLast('/')
+                        ))
+                    }
+
+                    val frames = repository.extractFrames(videoUri, (frameInterval * 1000).toLong())
+                    frames.forEachIndexed { frameIndex, frame ->
+                        if (_state.value.isPaused) {
+                            return@forEachIndexed
+                        }
+                        val extractedText = repository.processFrame(frame)
+                        repository.insertFrame(frame.copy(extractedText = extractedText))
+                    }
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            } finally {
+                _state.update { 
+                    it.copy(
+                        isProcessing = false,
+                        progress = ProcessingProgress()
+                    )
+                }
+            }
+        }
+    }
+
     private fun scanImages() {
         viewModelScope.launch {
-            _state.update { it.copy(isScanning = true) }
-            repository.scanDeviceImages()
-
             try {
+                _state.update { 
+                    it.copy(
+                        isScanning = true,
+                        progress = ProcessingProgress(type = ProcessingType.IMAGES)
+                    )
+                }
+                repository.scanDeviceImages()
+                
                 val images = repository.getAllImages().first()
                 processedImages = images.filter { it.extractedText == null }.toMutableList()
                 totalImages = processedImages.size
                 currentImageIndex = 0
 
-                _state.update {
-                    it.copy(
-                        isScanning = false,
-                        isProcessing = false,
-                        progress = 0f
-                    )
+                if (processedImages.isNotEmpty()) {
+                    startProcessing()
+                } else {
+                    resetProcessingState()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                _state.update { it.copy(error = e.message) }
                 resetProcessingState()
+            } finally {
+                _state.update { it.copy(isScanning = false) }
+            }
+        }
+    }
+
+    private fun processSelectedImages(uris: List<String>) {
+        viewModelScope.launch {
+            try {
+                _state.update { 
+                    it.copy(
+                        isProcessing = true,
+                        isPaused = false,
+                        progress = ProcessingProgress(
+                            total = uris.size,
+                            type = ProcessingType.IMAGES
+                        )
+                    )
+                }
+
+                val scanMode = settingsDataStore.scanMode.first()
+
+                uris.forEachIndexed { index, imageUri ->
+                    if (_state.value.isPaused) {
+                        return@forEachIndexed
+                    }
+
+                    _state.update {
+                        it.copy(progress = it.progress.copy(
+                            current = index + 1,
+                            currentItem = imageUri.substringAfterLast('/')
+                        ))
+                    }
+
+                    try {
+                        val imageId = System.currentTimeMillis() + index
+                        val image = ImageInfo(
+                            id = imageId,
+                            uri = imageUri,
+                            displayName = imageUri.substringAfterLast('/'),
+                            dateAdded = System.currentTimeMillis(),
+                            extractedText = null,
+                            label = null,
+                            confidence = null,
+                            modelName = null
+                        )
+
+                        repository.insertImage(image)
+
+                        // process it to extract text and generate tags
+                        val tags = repository.processImage(imageId, imageUri, scanMode.name)
+                        if (tags.isNotBlank()) {
+                            println("DEBUG: Processing selected image ${image.displayName}, got tags: $tags")
+                            repository.updateImageText(imageId, tags)
+                        } else {
+                            println("DEBUG: No tags found for selected image ${image.displayName}")
+                        }
+                    } catch (e: Exception) {
+                        println("DEBUG: Error processing selected image $imageUri: ${e.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                println("DEBUG: Error in processing selected images: ${e.message}")
+                _state.update { it.copy(error = e.message) }
+            } finally {
+                _state.update { 
+                    it.copy(
+                        isProcessing = false,
+                        progress = ProcessingProgress()
+                    )
+                }
             }
         }
     }
@@ -127,73 +291,63 @@ class HomeViewModel(
         if (processingJob?.isActive == true) return
 
         processingJob = viewModelScope.launch {
-            _state.update { it.copy(isProcessing = true, isPaused = false) }
-
-            val selectedModel = settingsDataStore.selectedModel.first() // Get model name
-
-            if (processedImages.isEmpty()) {
-                val images = repository.getAllImages().first()
-                processedImages = images.filter { it.extractedText == null }.toMutableList()
-                totalImages = processedImages.size
-                currentImageIndex = 0
-            }
-
-            if (processedImages.isNotEmpty()) {
-                processedImages.drop(currentImageIndex).forEach { image ->
-                    try {
-                        val extractedText = repository.processImage(image.id, image.uri, selectedModel)
-                        repository.updateImageText(image.id, extractedText)
-                        currentImageIndex++
-                        updateProgress()
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+            try {
+                _state.update { 
+                    it.copy(
+                        isProcessing = true,
+                        isPaused = false,
+                        progress = ProcessingProgress(
+                            total = totalImages,
+                            type = ProcessingType.IMAGES
+                        )
+                    )
                 }
-                if (currentImageIndex >= totalImages) resetProcessingState()
-            } else resetProcessingState()
+                val scanMode = settingsDataStore.scanMode.first()
+
+                while (currentImageIndex < processedImages.size && !_state.value.isPaused) {
+                    val image = processedImages[currentImageIndex]
+                    
+                    _state.update {
+                        it.copy(progress = it.progress.copy(
+                            current = currentImageIndex + 1,
+                            currentItem = image.displayName
+                        ))
+                    }
+
+                    try {
+                        // Process image to extract text and generate tags
+                        val tags = repository.processImage(image.id, image.uri, scanMode.name)
+                        if (tags.isNotBlank()) {
+                            println("DEBUG: Processing image ${image.displayName}, got tags: $tags")
+                            repository.updateImageText(image.id, tags)
+                        } else {
+                            println("DEBUG: No tags found for image ${image.displayName}")
+                        }
+                    } catch (e: Exception) {
+                        println("DEBUG: Error processing image ${image.displayName}: ${e.message}")
+                    }
+
+                    currentImageIndex++
+                    updateProgress()
+                }
+
+                if (currentImageIndex >= processedImages.size) {
+                    resetProcessingState()
+                }
+            } catch (e: Exception) {
+                println("DEBUG: Error in processing job: ${e.message}")
+                _state.update { it.copy(error = e.message) }
+                resetProcessingState()
+            }
         }
     }
-
-    private fun processSelectedImages(uris: List<String>) {
-        viewModelScope.launch {
-            _state.update { it.copy(isScanning = true) }
-
-            val selectedModel = settingsDataStore.selectedModel.first() // Get model name
-
-            processedImages = uris.mapIndexed { index, uri ->
-                ImageInfo(
-                    id = System.currentTimeMillis() + index,
-                    uri = uri,
-                    displayName = uri.substringAfterLast("/"),
-                    dateAdded = System.currentTimeMillis(),
-                    extractedText = null,
-                    label = "Unknown",
-                    confidence = 0.0f,
-                    modelName = selectedModel
-                )
-            }.toMutableList()
-
-            processedImages.forEach { image -> repository.insertImage(image) }
-            totalImages = processedImages.size
-            currentImageIndex = 0
-
-            _state.update { it.copy(isScanning = false, isProcessing = true) }
-            startProcessing()
-        }
-    }
-
 
     private fun pauseProcessing() {
-        processingJob?.cancel()
-        _state.update {
-            it.copy(
-                isProcessing = false,
-                isPaused = true
-            )
-        }
+        _state.update { it.copy(isPaused = true) }
     }
 
     private fun resumeProcessing() {
+        _state.update { it.copy(isPaused = false) }
         startProcessing()
     }
 
@@ -203,54 +357,26 @@ class HomeViewModel(
     }
 
     private fun resetProcessingState() {
-        processingJob?.cancel() // Cancel any ongoing processing
         currentImageIndex = 0
-        processedImages.clear()
         totalImages = 0
+        processedImages.clear()
         _state.update {
             it.copy(
                 isProcessing = false,
                 isPaused = false,
-                progress = 0f
+                progress = ProcessingProgress(),
+                error = null
             )
         }
     }
 
     private fun updateProgress() {
-        if (totalImages > 0) {
-            val progress = currentImageIndex.toFloat() / totalImages
-            if (progress >= 1f) {
-                // If progress is 100%, reset the processing state
-                resetProcessingState()
-            } else {
-                _state.update {
-                    it.copy(
-                        progress = progress,
-                        isProcessing = true,
-                        isPaused = false
-                    )
-                }
-            }
+        _state.update {
+            it.copy(progress = it.progress.copy(
+                current = currentImageIndex
+            ))
         }
     }
+
+    private fun navigateToFilteredImages(tag: Tag) {}
 }
-
-data class HomeViewState(
-    val isScanning: Boolean = false,
-    val isProcessing: Boolean = false,
-    val isPaused: Boolean = false,
-    val progress: Float = 0f,
-    val scanMode: ScanMode = ScanMode.ALL_DEVICE_IMAGES,
-    val tags: List<Tag> = emptyList(),
-    val recentScans: List<ImageInfo> = emptyList()
-)
-
-sealed interface HomeEvent {
-    data object StartProcessing : HomeEvent
-    data object PauseProcessing : HomeEvent
-    data object ResumeProcessing : HomeEvent
-    data object StopProcessing : HomeEvent
-    data object ScanImages : HomeEvent
-    data class ProcessSelectedImages(val uris: List<String>) : HomeEvent
-    data class ProcessSelectedVideos(val uris: List<String>) : HomeEvent
-} 

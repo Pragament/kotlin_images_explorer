@@ -21,4 +21,7 @@ sealed interface Dest {
 
     @Serializable
     data class TaggedImagesScreen(val tag: String) : Dest
+
+    @Serializable
+    data object FilteredImagesScreen : Dest
 }

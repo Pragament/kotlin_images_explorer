@@ -15,11 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.pragament.kotlin_images_explorer.presentation.viewmodel.ProcessingProgress
 import kotlin.math.roundToInt
 
 @Composable
 fun ProcessingStatus(
-    progress: Float = 0f,
+    progress: ProcessingProgress,
     isProcessing: Boolean = false,
     isPaused: Boolean = false,
     onStartProcessing: (() -> Unit)? = null,
@@ -37,12 +38,12 @@ fun ProcessingStatus(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 LinearProgressIndicator(
-                    progress = { progress },
+                    progress = { progress.current.toFloat() },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${(progress * 100).roundToInt()}% Complete",
+                    text = "${(progress)}% Complete",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))

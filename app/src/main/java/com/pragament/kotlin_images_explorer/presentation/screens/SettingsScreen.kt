@@ -23,7 +23,7 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()) // Enables scrolling
+            .verticalScroll(rememberScrollState())
     ) {
         Text(
             text = "Scan Mode Settings",
@@ -114,12 +114,6 @@ fun SettingsScreen(
                 )
             }
         }
-
-        // Model Selection Section
-        Text(
-            text = "Model Selection",
-            style = MaterialTheme.typography.titleLarge
-        )
 
         Spacer(modifier = Modifier.height(16.dp))
 

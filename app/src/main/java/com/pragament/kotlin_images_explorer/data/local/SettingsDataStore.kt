@@ -18,7 +18,7 @@ class SettingsDataStore(private val context: Context) {
     private val FRAME_INTERVAL = floatPreferencesKey("frame_interval")
 
     val scanMode: Flow<ScanMode> = context.dataStore.data.map { preferences ->
-        ScanMode.fromInt(preferences[SCAN_MODE] ?: ScanMode.ALL_DEVICE_IMAGES.ordinal)
+        ScanMode.fromInt(preferences[SCAN_MODE] ?: ScanMode.MULTIPLE_IMAGES.ordinal)
     }
 
     val selectedModel: Flow<String> = context.dataStore.data.map { preferences ->
@@ -64,6 +64,6 @@ enum class ScanMode {
     SINGLE_IMAGE;
 
     companion object {
-        fun fromInt(value: Int) = entries.getOrNull(value) ?: ALL_DEVICE_IMAGES
+        fun fromInt(value: Int) = entries.getOrNull(value) ?: MULTIPLE_IMAGES
     }
 }

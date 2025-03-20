@@ -13,7 +13,14 @@ interface ImageInfoDao {
     @Query("SELECT * FROM images ORDER BY dateAdded DESC")
     fun getAllImages(): Flow<List<ImageInfoEntity>>
 
-    @Query("SELECT * FROM images WHERE extractedText LIKE '%' || :tag || '%'")
+    @Query("""
+        SELECT * FROM images 
+        WHERE extractedText LIKE '%' || :tag || '%' 
+        OR label = :tag 
+        OR extractedText LIKE '%,' || :tag || ',%'
+        OR extractedText LIKE :tag || ',%'
+        OR extractedText LIKE '%,' || :tag
+    """)
     fun getImagesByTag(tag: String): Flow<List<ImageInfoEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -30,20 +37,20 @@ interface ImageInfoDao {
 
     @Query("""
         WITH RECURSIVE split(word, rest) AS (
-            SELECT '', extractedText || ' '
+            SELECT '', extractedText || ','
             FROM images
-            WHERE extractedText IS NOT NULL
+            WHERE extractedText IS NOT NULL AND extractedText != ''
             UNION ALL
             SELECT
-                substr(rest, 0, instr(rest, ' ')),
-                substr(rest, instr(rest, ' ')+1)
+                TRIM(substr(rest, 0, instr(rest, ','))),
+                TRIM(substr(rest, instr(rest, ',')+1))
             FROM split
             WHERE rest <> ''
         )
-        SELECT word, COUNT(*) as frequency
+        SELECT TRIM(word) as word, COUNT(*) as frequency
         FROM split
-        WHERE length(word) > 2
-        GROUP BY word
+        WHERE word <> '' AND length(TRIM(word)) > 2
+        GROUP BY TRIM(word)
         ORDER BY frequency DESC, word
         LIMIT 100
     """)
@@ -53,4 +60,4 @@ interface ImageInfoDao {
 data class TagCount(
     val word: String,
     val frequency: Int
-) 
+)

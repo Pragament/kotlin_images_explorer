@@ -24,20 +24,39 @@ class TaggedImagesListViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
 
-            // Fetch images
-            val images = repository.getAllImages().first()
-            val processedImages = images.filter { !it.extractedText.isNullOrEmpty() }
+            try {
+                repository.getAllImages()
+                    .map { images ->
+                        images.filter { image ->
+                            !image.extractedText.isNullOrBlank()
+                        }
+                    }
+                    .collect { processedImages ->
+                        println("DEBUG: Found ${processedImages.size} processed images")
+                        processedImages.forEach { image ->
+                            println("DEBUG: Image ${image.displayName} has tags: ${image.extractedText}")
+                        }
+                        
+                        val videoFrames = repository.getAllVideoFrames().first()
+                        val processedVideoFrames = videoFrames.filter { !it.extractedText.isNullOrEmpty() }
 
-            // Fetch video frames
-            val videoFrames = repository.getAllVideoFrames().first()
-            val processedVideoFrames = videoFrames.filter { !it.extractedText.isNullOrEmpty() }
-
-            _state.update {
-                it.copy(
-                    images = processedImages,
-                    videoFrames = processedVideoFrames, // Update this line
-                    isLoading = false
-                )
+                        _state.update {
+                            it.copy(
+                                images = processedImages,
+                                videoFrames = processedVideoFrames,
+                                isLoading = false
+                            )
+                        }
+                    }
+            } catch (e: Exception) {
+                println("DEBUG: Error loading data: ${e.message}")
+                _state.update { 
+                    it.copy(
+                        isLoading = false,
+                        images = emptyList(),
+                        videoFrames = emptyList()
+                    )
+                }
             }
         }
     }
@@ -50,31 +69,43 @@ class TaggedImagesListViewModel(
         filterModel: String,
         sortOption: String
     ) {
-   //     Log.d("TaggedImagesListViewModel", "Applying filters: $minConfidence, $maxConfidence, $topN, $searchQuery, $filterModel, $sortOption")
         viewModelScope.launch {
-            val filteredImages = repository.getAllImages().map { images ->
-                images.filter { image ->
-            //        Log.d("TaggedImagesListViewModel", "Filtering image: ${image.displayName} with confidence ${image.confidence} and model ${image.modelName} and label ${image.label} and text ${image.extractedText}tt ")
-                    (minConfidence == null || image.confidence?.let { it >= minConfidence } == true) &&
-                            (maxConfidence == null || image.confidence?.let { it <= maxConfidence } == true) &&
-                            (searchQuery.isEmpty() || image.label?.contains(searchQuery, ignoreCase = true) == true) &&
-                            (filterModel == "All" || image.modelName == filterModel)
-                }.let { images ->
-                    when (sortOption) {
-                        "(High to Low)" -> images.sortedByDescending { it.confidence }
-                        "(Low to High)" -> images.sortedBy { it.confidence }
-                        else -> images
-                    }
-                }.take(topN ?: images.size)
-            }.first() // Collect the first value from the Flow
+            try {
+                val filteredImages = repository.getAllImages()
+                    .map { images ->
+                        images.filter { image ->
+                            val confidenceMatch = (minConfidence == null || image.confidence?.let { it >= minConfidence } == true) &&
+                                    (maxConfidence == null || image.confidence?.let { it <= maxConfidence } == true)
+                            
+                            val modelMatch = filterModel == "All" || image.modelName == filterModel
+                            
+                            val searchMatch = searchQuery.isEmpty() || 
+                                image.extractedText?.contains(searchQuery, ignoreCase = true) == true ||
+                                image.label?.contains(searchQuery, ignoreCase = true) == true
 
-            _state.update { it.copy(images = filteredImages, isLoading = false) }
+                            confidenceMatch && modelMatch && searchMatch
+                        }.let { filtered ->
+                            when (sortOption) {
+                                "(High to Low)" -> filtered.sortedByDescending { it.confidence }
+                                "(Low to High)" -> filtered.sortedBy { it.confidence }
+                                else -> filtered
+                            }
+                        }.take(topN ?: 50)
+                    }
+                    .first()
+
+                println("DEBUG: Applied filters, found ${filteredImages.size} images")
+                _state.update { it.copy(images = filteredImages, isLoading = false) }
+            } catch (e: Exception) {
+                println("DEBUG: Error applying filters: ${e.message}")
+                _state.update { it.copy(isLoading = false) }
+            }
         }
     }
 
     fun clearFilters() {
         viewModelScope.launch {
-            loadProcessedData() //changed the whole loadProcessedImages() function to loadProcessedData() with addition for videos
+            loadProcessedData()
         }
     }
 }
