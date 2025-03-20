@@ -8,9 +8,8 @@ import androidx.navigation.toRoute
 import com.pragament.kotlin_images_explorer.presentation.navigation.Dest
 import com.pragament.kotlin_images_explorer.presentation.navigation.SubGraph
 import com.pragament.kotlin_images_explorer.presentation.navigation.bottomnav.KotlinImagesExplorerScreen
-import com.pragament.kotlin_images_explorer.presentation.screens.HomeScreen
-import com.pragament.kotlin_images_explorer.presentation.screens.SettingsScreen
-import com.pragament.kotlin_images_explorer.presentation.screens.TaggedImagesScreen
+import com.pragament.kotlin_images_explorer.presentation.screens.*
+import org.koin.androidx.compose.koinViewModel
 
 fun NavGraphBuilder.homeNavGraph(navController: NavController) {
     navigation<SubGraph.Home>(startDestination = Dest.KotlinImagesExplorerScreen) {
@@ -20,7 +19,11 @@ fun NavGraphBuilder.homeNavGraph(navController: NavController) {
         }
 
         composable<Dest.HomeScreen> {
-            HomeScreen()
+            HomeScreen(
+                onNavigateToFilteredImages = {
+                    navController.navigate(Dest.FilteredImagesScreen)
+                }
+            )
         }
 
         composable<Dest.SettingsScreen> {
@@ -31,6 +34,12 @@ fun NavGraphBuilder.homeNavGraph(navController: NavController) {
             val args = it.toRoute<Dest.TaggedImagesScreen>()
             TaggedImagesScreen(
                 tag = args.tag,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable<Dest.FilteredImagesScreen> {
+            FilteredImagesScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

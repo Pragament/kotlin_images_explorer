@@ -5,7 +5,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -13,11 +12,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.pragament.kotlin_images_explorer.presentation.navigation.Dest
-import com.pragament.kotlin_images_explorer.presentation.navigation.graph.homeNavGraph
-import com.pragament.kotlin_images_explorer.presentation.screens.HomeScreen
-import com.pragament.kotlin_images_explorer.presentation.screens.SettingsScreen
-import com.pragament.kotlin_images_explorer.presentation.screens.TaggedImagesListScreen
-import com.pragament.kotlin_images_explorer.presentation.screens.TaggedImagesScreen
+import com.pragament.kotlin_images_explorer.presentation.screens.*
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun KotlinImagesExplorerScreen() {
@@ -47,7 +43,11 @@ fun KotlinImagesExplorerScreen() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(KotlinImagesExplorerBottomNavItem.HOME.route) {
-                HomeScreen()
+                HomeScreen(
+                    onNavigateToFilteredImages = {
+                        navController.navigate(Dest.FilteredImagesScreen)
+                    }
+                )
             }
 
             composable(KotlinImagesExplorerBottomNavItem.RESULT.route) {
@@ -70,7 +70,11 @@ fun KotlinImagesExplorerScreen() {
                 )
             }
 
-            homeNavGraph(navController)
+            composable<Dest.FilteredImagesScreen> {
+                FilteredImagesScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

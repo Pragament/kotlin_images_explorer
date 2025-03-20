@@ -6,6 +6,7 @@ import com.pragament.kotlin_images_explorer.data.local.ImageDatabase
 import com.pragament.kotlin_images_explorer.data.local.SettingsDataStore
 import com.pragament.kotlin_images_explorer.data.repository.ImageRepositoryImpl
 import com.pragament.kotlin_images_explorer.domain.repository.ImageRepository
+import com.pragament.kotlin_images_explorer.presentation.viewmodel.FilteredImagesViewModel
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.HomeViewModel
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.SettingsViewModel
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.TaggedImagesListViewModel
@@ -43,6 +44,7 @@ val appModule = module {
     single { SettingsDataStore(androidContext()) }
 
     viewModelOf(::HomeViewModel)
+    viewModelOf(::FilteredImagesViewModel)
     viewModelOf(::TaggedImagesListViewModel)
     viewModel {
         TaggedImagesViewModel(

@@ -1,34 +1,56 @@
 package com.pragament.kotlin_images_explorer.presentation.screens
 
-import android.content.Context
-import android.graphics.BitmapFactory
-import android.net.Uri
-import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
-import com.bumptech.glide.integration.compose.GlideImage
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.TaggedImagesListViewModel
-import com.pragament.kotlin_images_explorer.ui.KotlinImagesExplorerIcons
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,10 +70,20 @@ fun TaggedImagesListScreen(
     var sortDropdownExpanded by remember { mutableStateOf(false) }
     var filterDropdownExpanded by remember { mutableStateOf(false) }
 
+    var isFilterVisible by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Scanned Results") }
+                title = { Text("Scanned Results") },
+                actions = {
+                    IconButton(onClick = { isFilterVisible = !isFilterVisible }) {
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = "Toggle Filter"
+                        )
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -60,148 +92,154 @@ fun TaggedImagesListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Filter UI
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    label = { Text("Search by label") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Conditionally show filter UI based on isFilterVisible
+            if (isFilterVisible) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TextField(
-                        value = minConfidence,
-                        onValueChange = { minConfidence = it },
-                        label = { Text("Min Confidence") },
-                        modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search by label") },
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextField(
+                            value = minConfidence,
+                            onValueChange = { minConfidence = it },
+                            label = { Text("Min Confidence") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
+                        TextField(
+                            value = maxConfidence,
+                            onValueChange = { maxConfidence = it },
+                            label = { Text("Max Confidence") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
+                    }
                     TextField(
-                        value = maxConfidence,
-                        onValueChange = { maxConfidence = it },
-                        label = { Text("Max Confidence") },
-                        modifier = Modifier.weight(1f),
+                        value = topN,
+                        onValueChange = { topN = it },
+                        label = { Text("Top-N Results") },
+                        modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
                     )
-                }
-                TextField(
-                    value = topN,
-                    onValueChange = { topN = it },
-                    label = { Text("Top-N Results") },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(
-                            value = sortOption,
-                            onValueChange = {},
-                            label = { Text("Confidence Sort") },
-                            readOnly = true,
-                            trailingIcon = {
-                                IconButton(onClick = { sortDropdownExpanded = true }) {
-                                    Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Dropdown")
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        DropdownMenu(
-                            expanded = sortDropdownExpanded,
-                            onDismissRequest = { sortDropdownExpanded = false }
-                        ) {
-                            DropdownMenuItem(onClick = {
-                                sortOption = "None"
-                                sortDropdownExpanded = false
-                            }, text = { Text("None") })
-
-                            DropdownMenuItem(onClick = {
-                                sortOption = "(High to Low)"
-                                sortDropdownExpanded = false
-                            }, text = { Text("(High to Low)") })
-
-                            DropdownMenuItem(onClick = {
-                                sortOption = "(Low to High)"
-                                sortDropdownExpanded = false
-                            }, text = { Text("(Low to High)") })
-                        }
-
-                    }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(
-                            value = filterModel,
-                            onValueChange = {},
-                            label = { Text("Model Filter") },
-                            readOnly = true,
-                            trailingIcon = {
-                                IconButton(onClick = { filterDropdownExpanded = true }) {
-                                    Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = "Dropdown")
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        DropdownMenu(
-                            expanded = filterDropdownExpanded,
-                            onDismissRequest = { filterDropdownExpanded = false }
-                        ) {
-                            DropdownMenuItem(onClick = {
-                                filterModel = "All"
-                                filterDropdownExpanded = false
-                            }, text = { Text("All") })
-                            DropdownMenuItem(onClick = {
-                                filterModel = "mobilenet_v1"
-                                filterDropdownExpanded = false
-                            }, text = { Text("mobilenet_v1") })
-                            DropdownMenuItem(onClick = {
-                                filterModel = "mobilenet_v2"
-                                filterDropdownExpanded = false
-                            }, text = { Text("mobilenet_v2") })
-                        }
-
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                      //       Apply filters
-                            viewModel.applyFilters(
-                                minConfidence.toFloatOrNull(),
-                                maxConfidence.toFloatOrNull(),
-                                topN.toIntOrNull(),
-                                searchQuery,
-                                filterModel,
-                                sortOption
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = sortOption,
+                                onValueChange = {},
+                                label = { Text("Confidence Sort") },
+                                readOnly = true,
+                                trailingIcon = {
+                                    IconButton(onClick = { sortDropdownExpanded = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDropDown,
+                                            contentDescription = "Dropdown"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             )
+                            DropdownMenu(
+                                expanded = sortDropdownExpanded,
+                                onDismissRequest = { sortDropdownExpanded = false }
+                            ) {
+                                DropdownMenuItem(onClick = {
+                                    sortOption = "None"
+                                    sortDropdownExpanded = false
+                                }, text = { Text("None") })
+
+                                DropdownMenuItem(onClick = {
+                                    sortOption = "(High to Low)"
+                                    sortDropdownExpanded = false
+                                }, text = { Text("(High to Low)") })
+
+                                DropdownMenuItem(onClick = {
+                                    sortOption = "(Low to High)"
+                                    sortDropdownExpanded = false
+                                }, text = { Text("(Low to High)") })
+                            }
                         }
-                    ) {
-                        Text("Apply Filters")
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = filterModel,
+                                onValueChange = {},
+                                label = { Text("Model Filter") },
+                                readOnly = true,
+                                trailingIcon = {
+                                    IconButton(onClick = { filterDropdownExpanded = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDropDown,
+                                            contentDescription = "Dropdown"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            DropdownMenu(
+                                expanded = filterDropdownExpanded,
+                                onDismissRequest = { filterDropdownExpanded = false }
+                            ) {
+                                DropdownMenuItem(onClick = {
+                                    filterModel = "All"
+                                    filterDropdownExpanded = false
+                                }, text = { Text("All") })
+                                DropdownMenuItem(onClick = {
+                                    filterModel = "mobilenet_v1"
+                                    filterDropdownExpanded = false
+                                }, text = { Text("mobilenet_v1") })
+                                DropdownMenuItem(onClick = {
+                                    filterModel = "mobilenet_v2"
+                                    filterDropdownExpanded = false
+                                }, text = { Text("mobilenet_v2") })
+                            }
+                        }
                     }
-                    Button(
-                        onClick = {
-                            // Clear filters
-                            searchQuery = ""
-                            minConfidence = ""
-                            maxConfidence = ""
-                            topN = ""
-                            sortOption = "Confidence (High to Low)"
-                            filterModel = "All"
-                            viewModel.clearFilters()
-                        }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Clear Filters")
+                        Button(
+                            onClick = {
+                                // Apply filters
+                                viewModel.applyFilters(
+                                    minConfidence.toFloatOrNull(),
+                                    maxConfidence.toFloatOrNull(),
+                                    topN.toIntOrNull(),
+                                    searchQuery,
+                                    filterModel,
+                                    sortOption
+                                )
+                            }
+                        ) {
+                            Text("Apply Filters")
+                        }
+                        Button(
+                            onClick = {
+                                // Clear filters
+                                searchQuery = ""
+                                minConfidence = ""
+                                maxConfidence = ""
+                                topN = ""
+                                sortOption = "Confidence (High to Low)"
+                                filterModel = "All"
+                                viewModel.clearFilters()
+                            }
+                        ) {
+                            Text("Clear Filters")
+                        }
                     }
                 }
             }
@@ -221,7 +259,7 @@ fun TaggedImagesListScreen(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                imageVector = KotlinImagesExplorerIcons.Search,
+                                imageVector = Icons.Default.Search,
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
                                 tint = MaterialTheme.colorScheme.primary
@@ -259,7 +297,8 @@ fun TaggedImagesListScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalGlideComposeApi::class)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ScannedImageCard(
     image: ImageInfo,
@@ -279,7 +318,6 @@ private fun ScannedImageCard(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
-
                 AsyncImage(
                     model = image.uri,
                     contentDescription = image.displayName,
@@ -288,8 +326,6 @@ private fun ScannedImageCard(
                         .size(80.dp)
                         .clip(MaterialTheme.shapes.small)
                 )
-
-
 
                 Column(
                     modifier = Modifier.weight(1f)
@@ -305,16 +341,18 @@ private fun ScannedImageCard(
                         val words = image.extractedText.split(Regex("\\s+"))
                             .filter { it.length > 2 }
                             .distinct()
-                            .take(15)
+                            .take(5)
 
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            words.forEach { word ->
-                                AssistChip(
-                                    onClick = { onTagClick(word) },
-                                    label = { Text(word) }
-                                )
+                        if (words.isNotEmpty()) {
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                words.forEach { word ->
+                                    AssistChip(
+                                        onClick = { onTagClick(word) },
+                                        label = { Text(word) }
+                                    )
+                                }
                             }
                         }
                     }
