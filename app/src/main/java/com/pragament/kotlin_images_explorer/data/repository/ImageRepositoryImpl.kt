@@ -3,12 +3,14 @@ package com.pragament.kotlin_images_explorer.data.repository
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.pragament.kotlin_images_explorer.ImageClassifier
 import com.pragament.kotlin_images_explorer.data.local.dao.ImageInfoDao
 import com.pragament.kotlin_images_explorer.data.local.dao.VideoFrameDao
 import com.pragament.kotlin_images_explorer.data.local.entity.ImageInfoEntity
@@ -136,36 +138,50 @@ class ImageRepositoryImpl(
         }
     }
 
+
+
     override suspend fun processImage(imageId: Long, uri: String, modelName: String): String {
         return withContext(Dispatchers.IO) {
             try {
                 val parsedUri = Uri.parse(uri)
-                val inputImage = InputImage.fromFilePath(context, parsedUri)
-                val result = textRecognizer.process(inputImage).await()
-                
-                // Process text into meaningful tags
-                val tags = result.textBlocks
-                    .flatMap { it.lines }
-                    .map { it.text.trim() }
-                    .filter { word ->
-                        word.isNotBlank() &&
-                        word.length >= 3 &&
-                        !word.equals("Error", ignoreCase = true) &&
-                        !word.matches(Regex("\\d+")) && // Skip pure numbers
-                        !word.matches(Regex(".*\\d{6,}.*")) // Skip words with long numbers
-                    }
-                    .distinct()
-                    .joinToString(",")
+                val bitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(parsedUri))
+                    ?: return@withContext "Error: Could not decode image."
 
-                println("DEBUG: Generated tags for image $imageId: $tags")
-                tags
+                val inputImage = InputImage.fromFilePath(context, parsedUri)
+                val textResult = textRecognizer.process(inputImage).await().text
+
+                val modelPath = getModelPath(modelName)
+                val classifier = ImageClassifier(context, modelPath)
+
+                val classificationResult = if (modelName == "mobilenet_v1") {
+                    classifier.classify(bitmap) ?: classifier.classifyModel2(bitmap)
+                } else {
+                    classifier.classifyModel2(bitmap)
+                }
+
+                val classificationText = classificationResult?.let { (label, confidence) ->
+                    "$label ${"%.2f".format(confidence)}"
+                } ?: "No classification result"
+
+                imageDao.getImageById(imageId)?.let { image ->
+                    val updatedImage = image.copy(
+                        extractedText = textResult,
+                        label = classificationResult?.first,
+                        confidence = classificationResult?.second,
+                        modelName = modelName
+                    )
+                    imageDao.updateImage(updatedImage)
+                }
+
+                "Classification: $classificationText\nModelName: $modelName\nText: $textResult\n"
             } catch (e: Exception) {
-                println("DEBUG: Error processing image $imageId: ${e.message}")
                 e.printStackTrace()
-                ""
+                "Error: ${e.message}"
             }
         }
     }
+
+
 
     override suspend fun insertImage(image: ImageInfo) {
         imageDao.insertImage(
