@@ -232,7 +232,7 @@ class HomeViewModel(
                     )
                 }
 
-                val scanMode = settingsDataStore.scanMode.first()
+                val selectedModel = settingsDataStore.selectedModel.first() // Get model name
 
                 uris.forEachIndexed { index, imageUri ->
                     if (_state.value.isPaused) {
@@ -262,7 +262,7 @@ class HomeViewModel(
                         repository.insertImage(image)
 
                         // process it to extract text and generate tags
-                        val tags = repository.processImage(imageId, imageUri, scanMode.name)
+                        val tags = repository.processImage(imageId, imageUri, selectedModel)
                         if (tags.isNotBlank()) {
                             println("DEBUG: Processing selected image ${image.displayName}, got tags: $tags")
                             repository.updateImageText(imageId, tags)

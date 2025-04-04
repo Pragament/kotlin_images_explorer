@@ -48,7 +48,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.TaggedImagesListViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -341,7 +340,7 @@ private fun ScannedImageCard(
                         val words = image.extractedText.split(Regex("\\s+"))
                             .filter { it.length > 2 }
                             .distinct()
-                            .take(5)
+                            .take(10)
 
                         if (words.isNotEmpty()) {
                             FlowRow(
