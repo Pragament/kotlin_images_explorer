@@ -171,7 +171,8 @@ class HomeViewModel(
                         if (_state.value.isPaused) {
                             return@forEachIndexed
                         }
-                        val extractedText = repository.processFrame(frame)
+                        val modelName= settingsDataStore.selectedModel.first()
+                        val extractedText = repository.processFrame(frame, modelName)
                         repository.insertFrame(frame.copy(extractedText = extractedText))
                     }
                 }

@@ -13,7 +13,7 @@ interface ImageRepository {
     suspend fun scanDeviceImages()
     suspend fun scanDeviceVideos()
     suspend fun extractFrames(videoUri: String, frameIntervalMs: Long): List<VideoFrame>
-    suspend fun processFrame(frame: VideoFrame): String
+    suspend fun processFrame(frame: VideoFrame, modelName: String): String
     suspend fun insertFrame(frame: VideoFrame)
     suspend fun getAllVideoFrames(): Flow<List<VideoFrame>>
     suspend fun processImage(imageId: Long, uri: String, modelName: String): String

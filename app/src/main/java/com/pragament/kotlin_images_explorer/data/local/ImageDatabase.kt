@@ -9,7 +9,7 @@ import com.pragament.kotlin_images_explorer.data.local.entity.VideoFrameEntity
 
 @Database(
     entities = [ImageInfoEntity::class, VideoFrameEntity::class],
-    version = 2 // Increment the version
+    version = 1 // Increment the version
 )
 abstract class ImageDatabase : RoomDatabase() {
     abstract val imageDao: ImageInfoDao
