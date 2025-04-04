@@ -1,5 +1,6 @@
 package com.pragament.kotlin_images_explorer.presentation.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,8 +51,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
+import com.pragament.kotlin_images_explorer.domain.model.VideoFrame
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.TaggedImagesListViewModel
 import org.koin.androidx.compose.koinViewModel
+import kotlin.math.log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -248,7 +252,7 @@ fun TaggedImagesListScreen(
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             } else {
-                if (state.images.isEmpty()) {
+                if (state.images.isEmpty() && state.videoFrames.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -283,13 +287,49 @@ fun TaggedImagesListScreen(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        // Optional: Header for Images
+                        if (state.images.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Scanned Images",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        }
+
+                        // List of images
                         items(state.images) { image ->
+                            Log.d("FRAMES", "Processing image: $image")
                             ScannedImageCard(
                                 image = image,
                                 onTagClick = onTagSelected
                             )
                         }
+
+                        // Optional: Header for Video Frames
+                        if (state.videoFrames.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Video Frames",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        }
+
+                        // List of video frames
+                        items(state.videoFrames) { frame ->
+                            Log.d("FRAMES", "Processing frame: $frame")
+                            ScannedVideoFrameCard(
+                                frame = frame,
+                                onTagClick = onTagSelected
+                            )
+                        }
                     }
+
+
+
                 }
             }
         }
@@ -356,6 +396,43 @@ private fun ScannedImageCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ScannedVideoFrameCard(
+    frame: VideoFrame,
+    onTagClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            AsyncImage(
+                model = frame.frameUri,
+                contentDescription = "Video Frame",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f) // Adjust aspect ratio for video frames
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (!frame.extractedText.isNullOrEmpty()) {
+                Text(
+                    text = frame.extractedText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(8.dp)
+                )
             }
         }
     }

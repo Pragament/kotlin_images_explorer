@@ -3,14 +3,17 @@ package com.pragament.kotlin_images_explorer.data.repository
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.pragament.kotlin_images_explorer.ImageClassifier
+import com.pragament.kotlin_images_explorer.data.local.SettingsDataStore
 import com.pragament.kotlin_images_explorer.data.local.dao.ImageInfoDao
 import com.pragament.kotlin_images_explorer.data.local.dao.VideoFrameDao
 import com.pragament.kotlin_images_explorer.data.local.entity.ImageInfoEntity
@@ -21,9 +24,14 @@ import com.pragament.kotlin_images_explorer.domain.model.VideoFrame
 import com.pragament.kotlin_images_explorer.domain.repository.ImageRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.net.URI
 
 class ImageRepositoryImpl(
     private val context: Context,
@@ -159,6 +167,7 @@ class ImageRepositoryImpl(
                     classifier.classifyModel2(bitmap)
                 }
 
+            //    Log.d("FRAMES", "Classification result: $classificationResult");
                 val classificationText = classificationResult?.let { (label, confidence) ->
                     "$label ${"%.2f".format(confidence)}"
                 } ?: "No classification result"
@@ -200,191 +209,178 @@ class ImageRepositoryImpl(
 
     override suspend fun scanDeviceVideos() {
         withContext(Dispatchers.IO) {
-            try {
-                val projection = arrayOf(
-                    MediaStore.Video.Media._ID,
-                    MediaStore.Video.Media.DISPLAY_NAME,
-                    MediaStore.Video.Media.DATE_ADDED,
-                    MediaStore.Video.Media.DURATION
-                )
+            val projection = arrayOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.DISPLAY_NAME,
+                MediaStore.Video.Media.DATE_ADDED
+            )
 
-                val selection = "${MediaStore.Video.Media.MIME_TYPE} LIKE ?"
-                val selectionArgs = arrayOf("video/%")
-                val sortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
+            val selection = "${MediaStore.Video.Media.MIME_TYPE} LIKE ?"
+            val selectionArgs = arrayOf("video/%")
+            val sortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
 
-                context.contentResolver.query(
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                    projection,
-                    selection,
-                    selectionArgs,
-                    sortOrder
-                )?.use { cursor ->
-                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                    val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-                    val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
-                    val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+            contentResolver.query(
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                sortOrder
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
 
-                    while (cursor.moveToNext()) {
-                        try {
-                            val id = cursor.getLong(idColumn)
-                            val name = cursor.getString(nameColumn)
-                            val dateAdded = cursor.getLong(dateColumn)
-                            val duration = cursor.getLong(durationColumn)
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val name = cursor.getString(nameColumn)
+                    val dateAdded = cursor.getLong(dateColumn)
 
-                            val contentUri = ContentUris.withAppendedId(
-                                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                                id
-                            )
+                    val contentUri = ContentUris.withAppendedId(
+                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                        id
+                    )
 
-                            println("DEBUG: Processing video: $name")
-                            val retriever = MediaMetadataRetriever()
-
-                            try {
-                                retriever.setDataSource(context, contentUri)
-                                var currentTime = 0L
-                                val frameInterval = 1000L // 1 second interval
-
-                                while (currentTime < duration) {
-                                    val frame = retriever.getFrameAtTime(
-                                        currentTime * 1000, // Convert to microseconds
-                                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-                                    )
-
-                                    if (frame != null) {
-                                        println("DEBUG: Extracted frame at ${currentTime}ms")
-                                        val inputImage = InputImage.fromBitmap(frame, 0)
-                                        val textResult = textRecognizer.process(inputImage).await()
-                                        val extractedText = textResult.text
-
-                                        if (extractedText.isNotBlank()) {
-                                            println("DEBUG: Found text in frame: $extractedText")
-                                            val videoFrame = VideoFrameEntity(
-                                                id = 0, // Auto-generated
-                                                videoId = id,
-                                                videoUri = contentUri.toString(),
-                                                frameTimestamp = currentTime,
-                                                extractedText = extractedText,
-                                                dateAdded = dateAdded
-                                            )
-                                            videoFrameDao.insertFrame(videoFrame)
-                                        }
-                                        frame.recycle()
-                                    }
-                                    currentTime += frameInterval
-                                }
-                            } catch (e: Exception) {
-                                println("DEBUG: Error processing video frame: ${e.message}")
-                                e.printStackTrace()
-                            } finally {
-                                try {
-                                    retriever.release()
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            println("DEBUG: Error processing video: ${e.message}")
-                            e.printStackTrace()
-                            // Continue with next video
-                        }
+                    val frames = extractFrames(contentUri.toString(),
+                        1000) // Extract frames every 1 seconds
+                    frames.forEach { frame ->
+                        val extractedText = processFrame(frame, "mobilenet_v1")
+                        insertFrame(frame.copy(extractedText = extractedText))
                     }
                 }
-            } catch (e: Exception) {
-                println("DEBUG: Error in video scanning: ${e.message}")
-                e.printStackTrace()
             }
         }
     }
 
-    override suspend fun extractFrames(videoUri: String, frameIntervalMs: Long): List<VideoFrame> {
+    override suspend fun getAllVideoFrames(): Flow<List<VideoFrame>> {
+        return videoFrameDao.getAllFrames().map { entities ->
+            entities.map { it.toDomainModel() }
+        }
+    }
+
+    // New methods for videos
+    override suspend fun extractFrames(videoUri: String, intervalMs: Long): List<VideoFrame> {
         return withContext(Dispatchers.IO) {
-            val frames = mutableListOf<VideoFrame>()
             val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(context, Uri.parse(videoUri))
 
-            try {
-                retriever.setDataSource(context, Uri.parse(videoUri))
-                var currentTime = 0L
-                val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: 0
+            val duration = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_DURATION
+            )?.toLong() ?: 0
 
-                while (currentTime <= duration) {
-                    val frame = retriever.getFrameAtTime(
-                        currentTime * 1000, // Convert to microseconds
-                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-                    )
+            println("Video duration: $duration ms") // Log the video duration
 
-                    if (frame != null) {
-                        frames.add(
-                            VideoFrame(
-                                id = 0,
-                                videoUri = videoUri,
-                                frameTimestamp = currentTime,
-                                bitmap = frame,
-                                extractedText = null
-                            )
-                        )
-                        frame.recycle()
-                    }
-                    currentTime += frameIntervalMs
+            val frames = mutableListOf<VideoFrame>()
+            var timestamp = 0L
+
+            while (timestamp < duration) {
+                val frame = retriever.getFrameAtTime(timestamp * 1000) // Convert to microseconds
+                if (frame != null) {
+                    frames.add(VideoFrame(
+                        id = System.currentTimeMillis() + timestamp,
+                        videoUri = videoUri,
+                        frameUri = saveFrameToStorage(frame),
+                        timestamp = timestamp
+                    ))
                 }
-            } catch (e: Exception) {
-                println("DEBUG: Error extracting frames: ${e.message}")
-                e.printStackTrace()
-            } finally {
-                try {
-                    retriever.release()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                timestamp += intervalMs
             }
 
+            retriever.release()
+            println("Extracted ${frames.size} " +
+                    "frames from video: $videoUri") // Log the number of frames extracted
             frames
         }
     }
 
-    override suspend fun processFrame(frame: VideoFrame): String {
+    override suspend fun processFrame(frame: VideoFrame, modelName: String): String {
         return withContext(Dispatchers.IO) {
             try {
-                if (frame.bitmap != null) {
-                    val inputImage = InputImage.fromBitmap(frame.bitmap, 0)
-                    val result = textRecognizer.process(inputImage).await()
-                    result.text
+                val bitmap = loadFrameFromStorage(frame.frameUri)
+                val inputImage = InputImage.fromBitmap(bitmap, 0)
+
+                val textResult = textRecognizer.process(inputImage).await().text
+
+
+                val modelPath = getModelPath(modelName)
+                val classifier = ImageClassifier(context, modelPath)
+
+                val classificationResult = if (modelName == "mobilenet_v1") {
+                    classifier.classify(bitmap) ?: classifier.classifyModel2(bitmap)
                 } else {
-                    ""
+                    classifier.classifyModel2(bitmap)
                 }
+
+                val classificationText = classificationResult?.let { (label, confidence) ->
+                    "$label ${"%.2f".format(confidence)}"
+                } ?: "No classification result"
+
+                return@withContext "Classification: $classificationText\nModelName: $modelName\nText: $textResult"
             } catch (e: Exception) {
-                println("DEBUG: Error processing frame: ${e.message}")
                 e.printStackTrace()
-                ""
+                "Error: ${e.message}"
             }
         }
     }
+
 
     override suspend fun insertFrame(frame: VideoFrame) {
         videoFrameDao.insertFrame(
             VideoFrameEntity(
                 id = frame.id,
-                videoId = Uri.parse(frame.videoUri).lastPathSegment?.toLong() ?: 0,
                 videoUri = frame.videoUri,
-                frameTimestamp = frame.frameTimestamp,
-                extractedText = frame.extractedText!!,
-                dateAdded = System.currentTimeMillis()
+                frameUri = frame.frameUri,
+                timestamp = frame.timestamp,
+                extractedText = frame.extractedText
             )
         )
     }
 
-    override suspend fun getAllVideoFrames(): Flow<List<VideoFrame>> {
-        return videoFrameDao.getAllFrames().map { entities ->
-            entities.map { entity ->
-                VideoFrame(
-                    id = entity.id,
-                    videoUri = entity.videoUri,
-                    frameTimestamp = entity.frameTimestamp,
-                    bitmap = null,
-                    extractedText = entity.extractedText
-                )
-            }
+    private suspend fun saveFrameToStorage(frame: Bitmap): String {
+        // Save the frame to internal storage and return its URI
+        // Implementation depends on your storage strategy
+        return withContext(Dispatchers.IO) {
+            val fileName = "frame_${System.currentTimeMillis()}.jpg"
+            val file = File(context.cacheDir, fileName) // Save to app's cache directory
+            val outputStream = FileOutputStream(file)
+            frame.compress(Bitmap.CompressFormat.JPEG, 90, outputStream) // Compress and save the bitmap
+            outputStream.flush()
+            outputStream.close()
+            file.toURI().toString() // Return the URI as a string
         }
     }
+
+    private suspend fun loadFrameFromStorage(frameUri: String): Bitmap {
+        // Load the frame from internal storage
+        // Implementation depends on your storage strategy
+        return withContext(Dispatchers.IO) {
+            val file = File(URI(frameUri)) // Convert URI string to File
+            val inputStream = FileInputStream(file)
+            BitmapFactory.decodeStream(inputStream) // Decode the file into a Bitmap
+        }
+    }
+
+
+//    override suspend fun getAllVideoFrames(): Flow<List<VideoFrame>> {
+//        return videoFrameDao.getAllFrames().map { entities ->
+//            entities.map { entity ->
+//                VideoFrame(
+//                    id = entity.id,
+//                    videoUri = entity.videoUri,
+//                    timestamp = entity.timestamp,
+//                    frameUri = "",
+//                    extractedText = entity.extractedText
+//                )
+//            }
+//        }
+//    }
+
+    private fun VideoFrameEntity.toDomainModel() = VideoFrame(
+        id = id,
+        videoUri = videoUri,
+        frameUri = frameUri,
+        timestamp = timestamp,
+        extractedText = extractedText
+    )
 
     private fun ImageInfoEntity.toDomainModel() = ImageInfo(
         id = id,
@@ -397,13 +393,6 @@ class ImageRepositoryImpl(
         modelName = modelName
     )
 
-    private fun VideoFrameEntity.toDomainModel() = VideoFrame(
-        id = id,
-        videoUri = videoUri,
-        frameTimestamp = frameTimestamp,
-        bitmap = null,
-        extractedText = extractedText
-    )
 }
 
 private fun getModelPath(modelName: String): String {
