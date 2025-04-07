@@ -15,12 +15,15 @@ interface VideoFrameDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVideo(video: VideoFrameEntity)
 
-    @Query("SELECT * FROM video_frames ORDER BY dateAdded DESC")
+    @Query("SELECT * FROM video_frames")
     fun getAllFrames(): Flow<List<VideoFrameEntity>>
 
-    @Query("SELECT * FROM video_frames WHERE videoId = :videoId ORDER BY frameTimestamp ASC")
+    @Query("SELECT * FROM video_frames WHERE id = :videoId ORDER BY timestamp ASC")
     fun getFramesForVideo(videoId: Long): Flow<List<VideoFrameEntity>>
 
     @Query("SELECT * FROM video_frames WHERE extractedText LIKE '%' || :searchText || '%'")
     fun searchFrames(searchText: String): Flow<List<VideoFrameEntity>>
+
+    @Query("UPDATE video_frames SET extractedText = :text WHERE id = :frameId")
+    suspend fun updateFrameText(frameId: Long, text: String)
 }
