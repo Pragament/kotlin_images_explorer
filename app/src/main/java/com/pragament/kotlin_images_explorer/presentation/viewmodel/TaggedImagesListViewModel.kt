@@ -20,7 +20,7 @@ class TaggedImagesListViewModel(
         loadProcessedData()
     }
 
-    private fun loadProcessedData() {
+     fun loadProcessedData() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
 
