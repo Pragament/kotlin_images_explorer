@@ -172,8 +172,20 @@ class HomeViewModel(
                             return@forEachIndexed
                         }
                         val modelName= settingsDataStore.selectedModel.first()
-                        val extractedText = repository.processFrame(frame, modelName)
-                        repository.insertFrame(frame.copy(extractedText = extractedText))
+                        val result = repository.processFrame(frame, modelName)
+                        val parts = result.split("|")
+                        if (parts.size == 4) {
+                            val updatedFrame = frame.copy(
+                                label = parts[0].takeIf { it != "ERROR" },
+                                confidence = parts[1].toFloatOrNull(),
+                                modelName = parts[2],
+                                extractedText = parts[3]
+                            )
+                            repository.insertFrame(updatedFrame)
+                        }
+
+
+
                     }
                 }
             } catch (e: Exception) {

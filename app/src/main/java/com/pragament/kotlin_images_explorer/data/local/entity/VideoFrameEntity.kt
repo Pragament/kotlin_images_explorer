@@ -9,5 +9,8 @@ data class VideoFrameEntity(
     val videoUri: String, // URI of the original video
     val frameUri: String, // URI of the extracted frame
     val timestamp: Long, // Timestamp of the frame in the video
-    val extractedText: String? = null
+    val extractedText: String? = null,
+    val label: String?,
+    val confidence: Float?,
+    val modelName: String?
 )

@@ -16,6 +16,7 @@ import com.pragament.kotlin_images_explorer.ImageClassifier
 import com.pragament.kotlin_images_explorer.data.local.SettingsDataStore
 import com.pragament.kotlin_images_explorer.data.local.dao.ImageInfoDao
 import com.pragament.kotlin_images_explorer.data.local.dao.VideoFrameDao
+import com.pragament.kotlin_images_explorer.data.local.entity.FrameProcessingResult
 import com.pragament.kotlin_images_explorer.data.local.entity.ImageInfoEntity
 import com.pragament.kotlin_images_explorer.data.local.entity.VideoFrameEntity
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
@@ -279,7 +280,12 @@ class ImageRepositoryImpl(
                         id = System.currentTimeMillis() + timestamp,
                         videoUri = videoUri,
                         frameUri = saveFrameToStorage(frame),
-                        timestamp = timestamp
+                        timestamp = timestamp,
+                        extractedText = null,
+                        label = null,
+                        confidence = null,
+                        modelName = null
+
                     ))
                 }
                 timestamp += intervalMs
@@ -292,35 +298,32 @@ class ImageRepositoryImpl(
         }
     }
 
-    override suspend fun processFrame(frame: VideoFrame, modelName: String): String {
-        return withContext(Dispatchers.IO) {
-            try {
-                val bitmap = loadFrameFromStorage(frame.frameUri)
-                val inputImage = InputImage.fromBitmap(bitmap, 0)
+    override suspend fun processFrame(frame: VideoFrame, modelName: String): String = withContext(Dispatchers.IO) {
+        try {
+            val bitmap = loadFrameFromStorage(frame.frameUri)
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
 
-                val textResult = textRecognizer.process(inputImage).await().text
+            val textResult = textRecognizer.process(inputImage).await().text
+            val modelPath = getModelPath(modelName)
+            val classifier = ImageClassifier(context, modelPath)
 
-
-                val modelPath = getModelPath(modelName)
-                val classifier = ImageClassifier(context, modelPath)
-
-                val classificationResult = if (modelName == "mobilenet_v1") {
-                    classifier.classify(bitmap) ?: classifier.classifyModel2(bitmap)
-                } else {
-                    classifier.classifyModel2(bitmap)
-                }
-
-                val classificationText = classificationResult?.let { (label, confidence) ->
-                    "$label ${"%.2f".format(confidence)}"
-                } ?: "No classification result"
-
-                return@withContext "Classification: $classificationText\nModelName: $modelName\nText: $textResult"
-            } catch (e: Exception) {
-                e.printStackTrace()
-                "Error: ${e.message}"
+            val classificationResult = if (modelName == "mobilenet_v1") {
+                classifier.classify(bitmap) ?: classifier.classifyModel2(bitmap)
+            } else {
+                classifier.classifyModel2(bitmap)
             }
+
+            val (label, confidence) = classificationResult ?: (null to null)
+
+            val confidenceFormatted = confidence?.let { "%.2f".format(it) } ?: "N/A"
+            return@withContext "$label|$confidenceFormatted|$modelName|$textResult"
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "ERROR|0.0|$modelName|${e.message ?: "Unknown error"}"
         }
     }
+
+
 
 
     override suspend fun insertFrame(frame: VideoFrame) {
@@ -330,7 +333,11 @@ class ImageRepositoryImpl(
                 videoUri = frame.videoUri,
                 frameUri = frame.frameUri,
                 timestamp = frame.timestamp,
-                extractedText = frame.extractedText
+                extractedText = frame.extractedText,
+                label = frame.label,
+                confidence = frame.confidence,
+                modelName = frame.modelName
+
             )
         )
     }
@@ -379,7 +386,10 @@ class ImageRepositoryImpl(
         videoUri = videoUri,
         frameUri = frameUri,
         timestamp = timestamp,
-        extractedText = extractedText
+        extractedText = extractedText,
+        label = label,
+        confidence = confidence,
+        modelName = modelName
     )
 
     private fun ImageInfoEntity.toDomainModel() = ImageInfo(
