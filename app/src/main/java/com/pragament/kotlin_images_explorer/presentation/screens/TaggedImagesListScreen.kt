@@ -405,7 +405,6 @@ private fun ScannedImageCard(
         }
     }
 }
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ScannedVideoFrameCard(
@@ -427,17 +426,56 @@ fun ScannedVideoFrameCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f) // Adjust aspect ratio for video frames
+                    .aspectRatio(16f / 9f)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            if (!frame.label.isNullOrBlank()) {
+                Text(
+                    text = "Label: ${frame.label}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            if (!frame.modelName.isNullOrBlank()) {
+                Text(
+                    text = "Model: ${frame.modelName}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            if (frame.confidence != null) {
+                Text(
+                    text = "Confidence: ${frame.confidence}",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
             if (!frame.extractedText.isNullOrEmpty()) {
+                Text(
+                    text = "Extracted Text:",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+
                 Text(
                     text = frame.extractedText,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(8.dp)
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
+
+//                FlowRow(
+//                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+//                    verticalArrangement = Arrangement.spacedBy(4.dp)
+//                ) {
+//                    frame.extractedText.split(",").map { it.trim() }.forEach { tag ->
+//                        AssistChip(
+//                            onClick = { onTagClick(tag) },
+//                            label = { Text(tag) }
+//                        )
+//                    }
+
             }
         }
     }

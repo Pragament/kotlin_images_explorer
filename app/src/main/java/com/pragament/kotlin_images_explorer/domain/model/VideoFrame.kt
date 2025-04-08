@@ -7,5 +7,8 @@ data class VideoFrame(
     val videoUri: String,
     val frameUri: String,
     val timestamp: Long,
-    val extractedText: String? = null
+    val extractedText: String? = null,
+    val label: String?,
+    val confidence: Float?,
+    val modelName: String?
 )
