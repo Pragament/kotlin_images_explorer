@@ -277,8 +277,17 @@ class HomeViewModel(
                         // process it to extract text and generate tags
                         val tags = repository.processImage(imageId, imageUri, selectedModel)
                         if (tags.isNotBlank()) {
-                            println("DEBUG: Processing selected image ${image.displayName}, got tags: $tags")
-                            repository.updateImageText(imageId, tags)
+                            // Clean up tags before saving
+                            val cleanTags = tags.split(Regex("\\s+"))
+                                .map { word -> 
+                                    word.trim()
+                                        .replace(Regex("[^a-zA-Z0-9]"), "") // Remove special characters
+                                        .replace(Regex("\\s+"), "") // Remove any spaces
+                                }
+                                .filter { it.isNotBlank() }
+                                .joinToString(" ")
+                            println("DEBUG: Processing selected image ${image.displayName}, got tags: $cleanTags")
+                            repository.updateImageText(imageId, cleanTags)
                         } else {
                             println("DEBUG: No tags found for selected image ${image.displayName}")
                         }
