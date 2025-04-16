@@ -332,9 +332,6 @@ fun TaggedImagesListScreen(
                             )
                         }
                     }
-
-
-
                 }
             }
         }
@@ -382,19 +379,22 @@ private fun ScannedImageCard(
                     if (!image.extractedText.isNullOrEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        val words = image.extractedText.split(Regex("\\s+"))
-                            .filter { it.length > 2 }
+                        val words = image.extractedText
+                            .split(" ")  // Split by space since we stored cleaned words
+                            .filter { it.isNotBlank() }
                             .distinct()
-                            .take(10)
 
                         if (words.isNotEmpty()) {
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 words.forEach { word ->
                                     AssistChip(
                                         onClick = { onTagClick(word) },
-                                        label = { Text(word) }
+                                        label = { Text(word) },
+                                        modifier = Modifier.padding(end = 4.dp)
                                     )
                                 }
                             }

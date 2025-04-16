@@ -3,6 +3,7 @@ package com.pragament.kotlin_images_explorer.data.repository
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
@@ -63,7 +64,13 @@ class ImageRepositoryImpl(
         return imageDao.getAllTags().map { tagCounts ->
             tagCounts
                 .filter { it.word.isNotBlank() }
-                .map { Tag(it.word, it.frequency) }
+                .map { 
+                    val cleanWord = it.word.trim()
+                        .replace(Regex("[^a-zA-Z0-9]"), "")
+                        .replace(Regex("\\s+"), "")
+                    Tag(cleanWord, it.frequency) 
+                }
+                .filter { it.word.isNotBlank() }
                 .sortedByDescending { it.frequency }
         }
     }
@@ -109,9 +116,18 @@ class ImageRepositoryImpl(
                                 id
                             )
 
+                            try {
+                                context.contentResolver.takePersistableUriPermission(
+                                    contentUri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                )
+                            } catch (e: SecurityException) {
+                                println("DEBUG: Could not take persistable permission for $contentUri")
+                            }
+
                             println("DEBUG: Processing image: $name")
 
-                            // Create and insert image entity
+                            // Create and insert image entity with persistable URI
                             val image = ImageInfoEntity(
                                 id = id,
                                 uri = contentUri.toString(),
@@ -147,8 +163,6 @@ class ImageRepositoryImpl(
         }
     }
 
-
-
     override suspend fun processImage(imageId: Long, uri: String, modelName: String): String {
         return withContext(Dispatchers.IO) {
             try {
@@ -168,14 +182,22 @@ class ImageRepositoryImpl(
                     classifier.classifyModel2(bitmap)
                 }
 
-            //    Log.d("FRAMES", "Classification result: $classificationResult");
                 val classificationText = classificationResult?.let { (label, confidence) ->
-                    "$label ${"%.2f".format(confidence)}"
-                } ?: "No classification result"
+                    "Classification: $label\nConfidence: ${"%.2f".format(confidence)}"
+                } ?: "No classification"
+
+                val cleanedText = textResult.split(Regex("[\\s,.;:!?]+"))
+                    .asSequence()
+                    .map { it.trim() }
+                    .filter { it.length > 2 }
+                    .map { it.replace(Regex("[^a-zA-Z0-9]"), "") }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                    .joinToString(" ")
 
                 imageDao.getImageById(imageId)?.let { image ->
                     val updatedImage = image.copy(
-                        extractedText = textResult,
+                        extractedText = cleanedText,
                         label = classificationResult?.first,
                         confidence = classificationResult?.second,
                         modelName = modelName
@@ -183,15 +205,13 @@ class ImageRepositoryImpl(
                     imageDao.updateImage(updatedImage)
                 }
 
-                "Classification: $classificationText\nModelName: $modelName\nText: $textResult\n"
+                "$classificationText\nModelName: $modelName\nText: $cleanedText"
             } catch (e: Exception) {
                 e.printStackTrace()
                 "Error: ${e.message}"
             }
         }
     }
-
-
 
     override suspend fun insertImage(image: ImageInfo) {
         imageDao.insertImage(
@@ -323,9 +343,6 @@ class ImageRepositoryImpl(
         }
     }
 
-
-
-
     override suspend fun insertFrame(frame: VideoFrame) {
         videoFrameDao.insertFrame(
             VideoFrameEntity(
@@ -365,21 +382,6 @@ class ImageRepositoryImpl(
             BitmapFactory.decodeStream(inputStream) // Decode the file into a Bitmap
         }
     }
-
-
-//    override suspend fun getAllVideoFrames(): Flow<List<VideoFrame>> {
-//        return videoFrameDao.getAllFrames().map { entities ->
-//            entities.map { entity ->
-//                VideoFrame(
-//                    id = entity.id,
-//                    videoUri = entity.videoUri,
-//                    timestamp = entity.timestamp,
-//                    frameUri = "",
-//                    extractedText = entity.extractedText
-//                )
-//            }
-//        }
-//    }
 
     private fun VideoFrameEntity.toDomainModel() = VideoFrame(
         id = id,
