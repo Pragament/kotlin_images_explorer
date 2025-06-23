@@ -47,3 +47,41 @@ captures/
 
 # Kotlin
 .kotlin
+
+# Android Studio
+.idea/
+.gradle/
+local.properties
+*.iml
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.ap_
+output.json
+
+# Android/IntelliJ
+*.iws
+*.ipr
+*.jks
+
+# Android test result
+test-results/
+androidTest-results/
+
+# Proguard
+proguard/
+proguard-rules.pro
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Crashlytics
+crashlytics-build.properties
+
+# Kotlin specific
+*.kotlin_module
