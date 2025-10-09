@@ -62,6 +62,10 @@ fun KotlinImagesExplorerScreen() {
                 SettingsScreen()
             }
 
+            composable(KotlinImagesExplorerBottomNavItem.Chat.route){
+                ChatScreen()
+            }
+
             composable<Dest.TaggedImagesScreen> {
                 val args = it.toRoute<Dest.TaggedImagesScreen>()
                 TaggedImagesScreen(
