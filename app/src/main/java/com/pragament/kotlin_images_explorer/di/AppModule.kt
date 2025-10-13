@@ -4,8 +4,11 @@ import android.content.ContentResolver
 import androidx.room.Room
 import com.pragament.kotlin_images_explorer.data.local.ImageDatabase
 import com.pragament.kotlin_images_explorer.data.local.SettingsDataStore
+import com.pragament.kotlin_images_explorer.data.mobilebert.MobileBertImpl
 import com.pragament.kotlin_images_explorer.data.repository.ImageRepositoryImpl
+import com.pragament.kotlin_images_explorer.domain.mobilebertmodel.MobileBertHelper
 import com.pragament.kotlin_images_explorer.domain.repository.ImageRepository
+import com.pragament.kotlin_images_explorer.presentation.viewmodel.ChatViewModel
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.FilteredImagesViewModel
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.HomeViewModel
 import com.pragament.kotlin_images_explorer.presentation.viewmodel.SettingsViewModel
@@ -53,4 +56,9 @@ val appModule = module {
         )
     }
     viewModelOf(::SettingsViewModel)
+    viewModelOf(::ChatViewModel)
+    single<MobileBertHelper> {
+        MobileBertImpl(get())
+    }
+
 }

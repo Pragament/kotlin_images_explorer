@@ -1,5 +1,6 @@
 package com.pragament.kotlin_images_explorer.presentation.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pragament.kotlin_images_explorer.data.local.ScanMode
@@ -273,10 +274,10 @@ class HomeViewModel(
                         )
 
                         repository.insertImage(image)
-
                         // process it to extract text and generate tags
                         val tags = repository.processImage(imageId, imageUri, selectedModel)
                         if (tags.isNotBlank()) {
+                            Log.d("tag" , tags)
                             // Clean up tags before saving
                             val cleanTags = tags.split(Regex("\\s+"))
                                 .map { word -> 
@@ -286,6 +287,7 @@ class HomeViewModel(
                                 }
                                 .filter { it.isNotBlank() }
                                 .joinToString(" ")
+                            Log.d("tag" , cleanTags)
                             println("DEBUG: Processing selected image ${image.displayName}, got tags: $cleanTags")
                             repository.updateImageText(imageId, cleanTags)
                         } else {

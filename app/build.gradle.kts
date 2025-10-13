@@ -43,6 +43,7 @@ android {
     buildFeatures {
         buildConfig = true
         compose = true
+        mlModelBinding = true
     }
     packaging {
         resources {
@@ -101,6 +102,6 @@ dependencies {
     // tensorflow
     implementation (libs.tensorflow.lite)
     implementation (libs.tensorflow.lite.support)
-
+    implementation(libs.tensorflow.lite.task.text)
 
 }

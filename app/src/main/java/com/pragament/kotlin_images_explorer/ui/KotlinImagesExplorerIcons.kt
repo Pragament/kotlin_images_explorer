@@ -5,9 +5,13 @@ import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.automirrored.rounded.Note
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.Notifications
@@ -35,8 +39,11 @@ object KotlinImagesExplorerIcons {
     val ResultBorder = Icons.Outlined.List
     val Settings = Icons.Filled.Settings
     val SettingsBorder = Icons.Outlined.Settings
-
+    val Chat = Icons.Filled.ChatBubble
+    val ChatBorder = Icons.Outlined.ChatBubble
+    val Send = Icons.Filled.Send
     val Add = Icons.Rounded.Add
+    val Image = Icons.Filled.Image
     val ArrowBack = Icons.AutoMirrored.Rounded.ArrowBack
     val Search = Icons.Rounded.Search
     val Share = Icons.Rounded.Share

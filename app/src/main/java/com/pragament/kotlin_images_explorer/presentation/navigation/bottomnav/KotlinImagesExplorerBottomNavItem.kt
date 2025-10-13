@@ -56,7 +56,13 @@ enum class KotlinImagesExplorerBottomNavItem(
         unselectedIcon = KotlinImagesExplorerIcons.Settings,
         label = "Settings",
         route = "settings",
-    );
+    ) ,
+    Chat(
+     selectedIcon = KotlinImagesExplorerIcons.Chat ,
+        unselectedIcon = KotlinImagesExplorerIcons.Chat,
+        label = "Chat" ,
+        route = "chat"
+    )
 }
 
 @Composable
