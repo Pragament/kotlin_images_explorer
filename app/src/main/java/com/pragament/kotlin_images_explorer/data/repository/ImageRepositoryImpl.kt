@@ -14,6 +14,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.pragament.kotlin_images_explorer.ImageClassifier
+import com.pragament.kotlin_images_explorer.ObjectDetector
 import com.pragament.kotlin_images_explorer.data.local.SettingsDataStore
 import com.pragament.kotlin_images_explorer.data.local.dao.ImageInfoDao
 import com.pragament.kotlin_images_explorer.data.local.dao.VideoFrameDao
@@ -167,24 +168,60 @@ class ImageRepositoryImpl(
         return withContext(Dispatchers.IO) {
             try {
                 val parsedUri = Uri.parse(uri)
-                val bitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(parsedUri))
+                val inputStream = context.contentResolver.openInputStream(parsedUri)
                     ?: return@withContext "Error: Could not decode image."
-
+                
+                val bitmap = BitmapFactory.decodeStream(inputStream)
                 val inputImage = InputImage.fromFilePath(context, parsedUri)
                 val textResult = textRecognizer.process(inputImage).await().text
-
                 val modelPath = getModelPath(modelName)
-                val classifier = ImageClassifier(context, modelPath)
 
-                val classificationResult = if (modelName == "mobilenet_v1") {
-                    classifier.classify(bitmap) ?: classifier.classifyModel2(bitmap)
+                var classificationText = "No classification"
+                var classificationLabel: String? = null
+                var classificationConfidence: Float? = null
+
+                if (modelName.lowercase().contains("yolo")) {
+                     val objectDetector = ObjectDetector(context, modelPath)
+                     val detections = objectDetector.detect(bitmap)
+                     
+                     if (detections.isNotEmpty()) {
+                        // For simplicity, take the highest confidence detection as the "main" label
+                        // In reality, you'd likely want to store all of them or a summary
+                        val bestDetection = detections.maxByOrNull { it.confidence }
+                        classificationLabel = bestDetection?.label
+                        classificationConfidence = bestDetection?.confidence
+                        
+                        classificationText = "Detected: ${detections.joinToString { "${it.label} (${"%.2f".format(it.confidence)})" }}"
+                     } else {
+                         classificationText = "No objects detected"
+                     }
+                     // TODO: Update ImageInfo metadata with full detections list if needed
                 } else {
-                    classifier.classifyModel2(bitmap)
-                }
+                     // Try primary model path
+                     var classifier = ImageClassifier(context, modelPath)
+                     
+                     // Fallback for EfficientNet if primary load failed (interpreter is null) and it's efficientnet
+                     if (classifier.isModelLoaded().not() && modelName == "efficientnet_lite0") {
+                         // Try fallback names
+                         classifier = ImageClassifier(context, "efficientnet-lite0.tflite")
+                         if (classifier.isModelLoaded().not()) {
+                             classifier = ImageClassifier(context, "efficientnet-lite0-int8.tflite")
+                         }
+                     }
 
-                val classificationText = classificationResult?.let { (label, confidence) ->
-                    "Classification: $label\nConfidence: ${"%.2f".format(confidence)}"
-                } ?: "No classification"
+                     if (classifier.isModelLoaded().not()) {
+                         return@withContext "Error: Model file not found. Pls Download|$modelPath|$modelName|$textResult"
+                     }
+
+                    val classificationResult = classifier.classifyModel2(bitmap)
+
+                    classificationLabel = classificationResult?.first
+                    classificationConfidence = classificationResult?.second
+                    
+                    classificationText = classificationResult?.let { (label, confidence) ->
+                        "Classification: $label\nConfidence: ${"%.2f".format(confidence)}"
+                    } ?: "No classification"
+                }
 
                 val cleanedText = textResult.split(Regex("[\\s,.;:!?]+"))
                     .asSequence()
@@ -198,8 +235,8 @@ class ImageRepositoryImpl(
                 imageDao.getImageById(imageId)?.let { image ->
                     val updatedImage = image.copy(
                         extractedText = cleanedText,
-                        label = classificationResult?.first,
-                        confidence = classificationResult?.second,
+                        label = classificationLabel,
+                        confidence = classificationConfidence,
                         modelName = modelName
                     )
                     imageDao.updateImage(updatedImage)
@@ -325,18 +362,44 @@ class ImageRepositoryImpl(
 
             val textResult = textRecognizer.process(inputImage).await().text
             val modelPath = getModelPath(modelName)
-            val classifier = ImageClassifier(context, modelPath)
-
-            val classificationResult = if (modelName == "mobilenet_v1") {
-                classifier.classify(bitmap) ?: classifier.classifyModel2(bitmap)
+            
+            var resultString = ""
+            
+            if (modelName.lowercase().contains("yolo")) {
+                 val objectDetector = ObjectDetector(context, modelPath)
+                 val detections = objectDetector.detect(bitmap)
+                 
+                 val bestLabel = detections.maxByOrNull { it.confidence }?.label
+                 val bestConf = detections.maxByOrNull { it.confidence }?.confidence
+                 val confidenceFormatted = bestConf?.let { "%.2f".format(it) } ?: "N/A"
+                 
+                 resultString = "$bestLabel|$confidenceFormatted|$modelName|$textResult"
             } else {
-                classifier.classifyModel2(bitmap)
+                 // Try primary model path
+                 var classifier = ImageClassifier(context, modelPath)
+                 
+                 // Fallback for EfficientNet if primary load failed (interpreter is null) and it's efficientnet
+                 if (classifier.isModelLoaded().not() && modelName == "efficientnet_lite0") {
+                     // Try fallback names
+                     classifier = ImageClassifier(context, "efficientnet-lite0.tflite")
+                     if (classifier.isModelLoaded().not()) {
+                         classifier = ImageClassifier(context, "efficientnet-lite0-int8.tflite")
+                     }
+                 }
+
+                 if (classifier.isModelLoaded().not()) {
+                     return@withContext "Error: Model file not found|$modelPath|$modelName|$textResult"
+                 }
+
+                 val classificationResult = classifier.classifyModel2(bitmap)
+                 
+                 val (label, confidence) = classificationResult ?: ("Unknown" to 0.0f)
+                 val confidenceFormatted = "%.2f".format(confidence)
+                 
+                 resultString = "$label|$confidenceFormatted|$modelName|$textResult"
             }
 
-            val (label, confidence) = classificationResult ?: (null to null)
-
-            val confidenceFormatted = confidence?.let { "%.2f".format(it) } ?: "N/A"
-            return@withContext "$label|$confidenceFormatted|$modelName|$textResult"
+            return@withContext resultString
         } catch (e: Exception) {
             e.printStackTrace()
             "ERROR|0.0|$modelName|${e.message ?: "Unknown error"}"
@@ -407,10 +470,14 @@ class ImageRepositoryImpl(
 
 }
 
-private fun getModelPath(modelName: String): String {
-    return when (modelName) {
-        "mobilenet_v1" -> "model1.tflite"
-        "mobilenet_v2" -> "model2.tflite"
-        else -> throw IllegalArgumentException("Unsupported model: $modelName")
+    private fun getModelPath(modelName: String): String {
+        return when (modelName) {
+            "mobilenet_v1" -> "model1.tflite"
+            "mobilenet_v2" -> "model2.tflite"
+            "yolov8n" -> "yolov8n.tflite"
+            "efficientnet_lite0" -> {
+               "efficientnet_lite0.tflite"
+            }
+            else -> "model1.tflite"
+        }
     }
-}

@@ -58,6 +58,10 @@ dependencies {
 //    kapt(libs.compiler)
     implementation(libs.compose)
 
+    // TFLite core and support libraries
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0") // Optional: for GPU acceleration
 
 
     implementation(libs.androidx.core.ktx)

@@ -145,6 +145,22 @@ fun SettingsScreen(
                     selected = state.selectedModel == "mobilenet_v2",
                     onClick = { viewModel.setModel("mobilenet_v2") }
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ModelSelectionOption(
+                    title = "YOLOv8 Nano (Object Detection)",
+                    selected = state.selectedModel == "yolov8n",
+                    onClick = { viewModel.setModel("yolov8n") }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ModelSelectionOption(
+                    title = "EfficientNet Lite0 (Classification)",
+                    selected = state.selectedModel == "efficientnet_lite0",
+                    onClick = { viewModel.setModel("efficientnet_lite0") }
+                )
             }
         }
     }
