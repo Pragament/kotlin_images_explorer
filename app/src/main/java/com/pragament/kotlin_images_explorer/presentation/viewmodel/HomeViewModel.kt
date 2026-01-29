@@ -1,14 +1,20 @@
 package com.pragament.kotlin_images_explorer.presentation.viewmodel
 
+import android.graphics.Bitmap
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewModelScope
+import com.pragament.kotlin_images_explorer.BoundingBox
+import com.pragament.kotlin_images_explorer.YoloDetector
 import com.pragament.kotlin_images_explorer.data.local.ScanMode
 import com.pragament.kotlin_images_explorer.data.local.SettingsDataStore
 import com.pragament.kotlin_images_explorer.domain.model.ImageInfo
 import com.pragament.kotlin_images_explorer.domain.model.Tag
 import com.pragament.kotlin_images_explorer.domain.model.VideoFrame
 import com.pragament.kotlin_images_explorer.domain.repository.ImageRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +22,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 
 data class ProcessingProgress(
     val current: Int = 0,
@@ -55,10 +63,18 @@ sealed class HomeEvent {
 }
 
 class HomeViewModel(
+    application: Application,
     private val repository: ImageRepository,
     private val settingsDataStore: SettingsDataStore
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
+    var detectedObjects by mutableStateOf<List<BoundingBox>>(emptyList())
+        private set
+    var currentImageBitmap by mutableStateOf<Bitmap?>(null)
+
+        private set
+    // 2. Initialize the Detector (Make sure to pass context, might need Application context)
+    private val yoloDetector = YoloDetector(getApplication<Application>().applicationContext)
     private val _state = MutableStateFlow(HomeViewState())
     val state: StateFlow<HomeViewState> = _state.asStateFlow()
 
@@ -201,7 +217,14 @@ class HomeViewModel(
             }
         }
     }
+    fun analyzeImage(bitmap: Bitmap) {
+        currentImageBitmap = bitmap
 
+        viewModelScope.launch(Dispatchers.Default) {
+            val boxes = yoloDetector.detect(bitmap)
+            detectedObjects = boxes
+        }
+    }
     private fun scanImages() {
         viewModelScope.launch {
             try {

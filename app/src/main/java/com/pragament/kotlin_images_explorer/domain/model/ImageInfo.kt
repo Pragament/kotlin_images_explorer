@@ -1,5 +1,7 @@
 package com.pragament.kotlin_images_explorer.domain.model
 
+import com.pragament.kotlin_images_explorer.ObjectDetector
+
 data class ImageInfo(
     val id: Long,
     val uri: String,
@@ -8,5 +10,6 @@ data class ImageInfo(
     val extractedText: String? = null,
     val label: String?,
     val confidence: Float?,
-    val modelName: String?
-) 
+    val modelName: String?,
+    val detections: List<ObjectDetector.DetectionResult>? = null
+)
